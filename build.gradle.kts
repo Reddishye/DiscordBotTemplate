@@ -1,42 +1,42 @@
 plugins {
-    id 'java'
-    id 'com.gradleup.shadow' version '9.0.0-beta4'
-    id 'application'
-    id "io.sentry.jvm.gradle" version "5.3.0"
+    id("java")
+    id("com.gradleup.shadow") version "9.0.0-beta4"
+    id("application")
+    id("io.sentry.jvm.gradle") version "5.3.0"
     id("com.diffplug.spotless") version "7.0.2"
 }
 
-group = 'es.redactado'
-version = '1.0-SNAPSHOT'
+group = "es.redactado"
+version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
-    maven { url 'https://jitpack.io' }
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
-    implementation 'org.incendo:cloud-jda5:1.0.0-beta.3' // Cloud Discord
-    implementation("net.dv8tion:JDA:5.3.2") { exclude module: 'opus-java' } // Discord Integration
+    implementation("org.incendo:cloud-jda5:1.0.0-beta.3") // Cloud Discord
+    implementation("net.dv8tion:JDA:5.3.2") { exclude(module = "opus-java") } // Discord Integration
     implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
     implementation("com.google.inject:guice:7.0.0") // Dependency Injection
     implementation("com.github.ben-manes.caffeine:caffeine:3.2.0")
-    implementation 'io.github.cdimascio:dotenv-java:3.2.0'
+    implementation("io.github.cdimascio:dotenv-java:3.2.0")
 
     implementation("ch.qos.logback:logback-classic:1.5.6")
-    implementation 'org.slf4j:slf4j-api:2.0.9'
-    implementation 'org.fusesource.jansi:jansi:2.4.0'
+    implementation("org.slf4j:slf4j-api:2.0.9")
+    implementation("org.fusesource.jansi:jansi:2.4.0")
 
     implementation("com.github.nguyenq:tess4j:tess4j-5.15.0")
 
-    testImplementation platform('org.junit:junit-bom:5.10.0')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation(platform("org.junit:junit-bom:5.10.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
 application {
-    mainClass = 'es.redactado.Main'
+    mainClass.set("es.redactado.Main")
 }
 
-test {
+tasks.test {
     useJUnitPlatform()
 }
 
@@ -45,9 +45,9 @@ spotless {
 
     format("misc") {
         target(
-                "*.gradle.kts",
-                ".gitattributes",
-                ".gitignore"
+            "*.gradle.kts",
+            ".gitattributes",
+            ".gitignore"
         )
 
         trimTrailingWhitespace()
