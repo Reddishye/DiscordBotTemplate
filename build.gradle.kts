@@ -26,18 +26,11 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.9")
     implementation("org.fusesource.jansi:jansi:2.4.0")
 
-    implementation("com.github.nguyenq:tess4j:tess4j-5.15.0")
-
-    testImplementation(platform("org.junit:junit-bom:5.10.0"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
+    implementation("com.github.nguyenq:tess4j:tess4j-5.15.0") // Tessarect OCR
 }
 
 application {
     mainClass.set("es.redactado.Main")
-}
-
-tasks.test {
-    useJUnitPlatform()
 }
 
 spotless {
