@@ -1,1 +1,1 @@
-rootProject.name = "DiscordBotTemplateJDA"
+rootProject.name = "DiscordBotTemplate"
