@@ -52,8 +52,6 @@ public class Main extends ListenerAdapter {
         api.addEventListener(injector.getInstance(CommandListener.class));
 
         api.addEventListener(this);
-
-        injector.injectMembers(api);
     }
 
     @Override
