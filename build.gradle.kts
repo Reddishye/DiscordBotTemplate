@@ -15,7 +15,6 @@ repositories {
 }
 
 dependencies {
-    implementation("org.incendo:cloud-jda5:1.0.0-beta.3") // Cloud Discord
     implementation("net.dv8tion:JDA:5.3.2") { exclude(module = "opus-java") } // Discord Integration
     implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
     implementation("com.google.inject:guice:7.0.0") // Dependency Injection
