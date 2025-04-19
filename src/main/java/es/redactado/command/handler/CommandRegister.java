@@ -7,12 +7,11 @@ import com.google.inject.Injector;
 import es.redactado.command.*;
 import es.redactado.command.type.BaseMessageContextCommand;
 import es.redactado.command.type.BaseSlashCommand;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
-
-import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Inspired on ZeyoYT CommandRegister used on AiLama.
@@ -30,20 +29,23 @@ public class CommandRegister {
         this.slashCommands = new HashMap<>();
         this.messageContextCommands = new HashMap<>();
 
-        this.slashCommandDataCache = Caffeine.newBuilder()
-                .expireAfterWrite(5, TimeUnit.MINUTES)
-                .maximumSize(100)
-                .build();
+        this.slashCommandDataCache =
+                Caffeine.newBuilder()
+                        .expireAfterWrite(5, TimeUnit.MINUTES)
+                        .maximumSize(100)
+                        .build();
 
-        this.contextCommandDataCache = Caffeine.newBuilder()
-                .expireAfterWrite(5, TimeUnit.MINUTES)
-                .maximumSize(100)
-                .build();
+        this.contextCommandDataCache =
+                Caffeine.newBuilder()
+                        .expireAfterWrite(5, TimeUnit.MINUTES)
+                        .maximumSize(100)
+                        .build();
 
-        this.allCommandsDataCache = Caffeine.newBuilder()
-                .expireAfterWrite(5, TimeUnit.MINUTES)
-                .maximumSize(100)
-                .build();
+        this.allCommandsDataCache =
+                Caffeine.newBuilder()
+                        .expireAfterWrite(5, TimeUnit.MINUTES)
+                        .maximumSize(100)
+                        .build();
 
         addCommand(injector.getInstance(PingCommand.class));
     }
@@ -57,32 +59,38 @@ public class CommandRegister {
     }
 
     public List<SlashCommandData> getCommandsSlashData() {
-        return slashCommandDataCache.get("slashCommands", key -> {
-            List<SlashCommandData> commands = new ArrayList<>();
-            for (BaseSlashCommand command : this.slashCommands.values()) {
-                commands.add(command.getCommandData());
-            }
-            return commands;
-        });
+        return slashCommandDataCache.get(
+                "slashCommands",
+                key -> {
+                    List<SlashCommandData> commands = new ArrayList<>();
+                    for (BaseSlashCommand command : this.slashCommands.values()) {
+                        commands.add(command.getCommandData());
+                    }
+                    return commands;
+                });
     }
 
     public List<CommandData> getContextCommandsData() {
-        return contextCommandDataCache.get("contextCommands", key -> {
-            List<CommandData> commands = new ArrayList<>();
-            for (BaseMessageContextCommand command : this.messageContextCommands.values()) {
-                commands.add(command.getCommandData());
-            }
-            return commands;
-        });
+        return contextCommandDataCache.get(
+                "contextCommands",
+                key -> {
+                    List<CommandData> commands = new ArrayList<>();
+                    for (BaseMessageContextCommand command : this.messageContextCommands.values()) {
+                        commands.add(command.getCommandData());
+                    }
+                    return commands;
+                });
     }
 
     public List<CommandData> getAllCommandsData() {
-        return allCommandsDataCache.get("allCommands", key -> {
-            List<CommandData> commands = new ArrayList<>();
-            commands.addAll(getContextCommandsData());
-            commands.addAll(getCommandsSlashData());
-            return commands;
-        });
+        return allCommandsDataCache.get(
+                "allCommands",
+                key -> {
+                    List<CommandData> commands = new ArrayList<>();
+                    commands.addAll(getContextCommandsData());
+                    commands.addAll(getCommandsSlashData());
+                    return commands;
+                });
     }
 
     public HashMap<String, BaseSlashCommand> getSlashCommandMap() {
@@ -96,7 +104,8 @@ public class CommandRegister {
     public void addCommand(BaseSlashCommand command) {
         String commandName = command.getCommandData().getName();
         if (this.slashCommands.containsKey(commandName)) {
-            throw new IllegalArgumentException("Command with name " + commandName + " already exists");
+            throw new IllegalArgumentException(
+                    "Command with name " + commandName + " already exists");
         }
         this.slashCommands.put(commandName, command);
         invalidateCache();
@@ -105,7 +114,8 @@ public class CommandRegister {
     public void addCommand(BaseMessageContextCommand command) {
         String commandName = command.getCommandData().getName();
         if (this.messageContextCommands.containsKey(commandName)) {
-            throw new IllegalArgumentException("Command with name " + commandName + " already exists");
+            throw new IllegalArgumentException(
+                    "Command with name " + commandName + " already exists");
         }
         this.messageContextCommands.put(commandName, command);
         invalidateCache();

@@ -2,15 +2,14 @@ package es.redactado.command.handler;
 
 import com.google.inject.Inject;
 import io.sentry.Sentry;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 import net.dv8tion.jda.api.events.interaction.command.MessageContextInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.function.Supplier;
 
 public class CommandListener extends ListenerAdapter {
     private static final Logger LOGGER = LoggerFactory.getLogger(CommandListener.class);
@@ -30,8 +29,7 @@ public class CommandListener extends ListenerAdapter {
                 commandName,
                 "message context",
                 () -> commandRegister.getMessageContextCommandMap().containsKey(commandName),
-                () -> commandRegister.getUserContextCommand(commandName).handle(event)
-        );
+                () -> commandRegister.getUserContextCommand(commandName).handle(event));
     }
 
     @Override
@@ -41,8 +39,7 @@ public class CommandListener extends ListenerAdapter {
                 commandName,
                 "slash",
                 () -> commandRegister.getSlashCommandMap().containsKey(commandName),
-                () -> commandRegister.getSlashCommand(commandName).handle(event)
-        );
+                () -> commandRegister.getSlashCommand(commandName).handle(event));
     }
 
     private void handleCommand(
@@ -55,13 +52,14 @@ public class CommandListener extends ListenerAdapter {
 
         if (commandExists.get()) {
             LOGGER.info("Executing {} command: {}", commandType, commandName);
-            commandExecutor.execute(() -> {
-                try {
-                    commandExecution.run();
-                } catch (Exception e) {
-                    Sentry.captureException(e);
-                }
-            });
+            commandExecutor.execute(
+                    () -> {
+                        try {
+                            commandExecution.run();
+                        } catch (Exception e) {
+                            Sentry.captureException(e);
+                        }
+                    });
         } else {
             LOGGER.info("Command not found: {} (type: {})", commandName, commandType);
         }

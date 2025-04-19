@@ -2,11 +2,11 @@ package es.redactado;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import es.redactado.command.PingCommand;
 import es.redactado.command.handler.CommandListener;
 import es.redactado.command.handler.CommandRegister;
 import io.github.cdimascio.dotenv.Dotenv;
 import io.sentry.Sentry;
+import javax.annotation.Nonnull;
 import net.dv8tion.jda.api.events.ExceptionEvent;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
@@ -15,8 +15,6 @@ import net.dv8tion.jda.api.sharding.DefaultShardManagerBuilder;
 import net.dv8tion.jda.api.sharding.ShardManager;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nonnull;
 
 public class Main extends ListenerAdapter {
     private Injector injector;
@@ -30,20 +28,24 @@ public class Main extends ListenerAdapter {
     public void run() {
         injector = Guice.createInjector(new BotModule(this));
 
-        api = DefaultShardManagerBuilder.createDefault(injector.getInstance(Dotenv.class).get("DISCORD_TOKEN"))
-                .setAutoReconnect(true)
-                .addEventListeners(new ListenerAdapter() {
-                    @Override
-                    public void onGenericEvent(@NotNull GenericEvent event) {
-                        LoggerFactory.getLogger(this.toString()).debug("Generic event: {}", event);
-                    }
+        api =
+                DefaultShardManagerBuilder.createDefault(
+                                injector.getInstance(Dotenv.class).get("DISCORD_TOKEN"))
+                        .setAutoReconnect(true)
+                        .addEventListeners(
+                                new ListenerAdapter() {
+                                    @Override
+                                    public void onGenericEvent(@NotNull GenericEvent event) {
+                                        LoggerFactory.getLogger(this.toString())
+                                                .debug("Generic event: {}", event);
+                                    }
 
-                    @Override
-                    public void onException(@Nonnull ExceptionEvent event) {
-                        Sentry.captureException(event.getCause());
-                    }
-                })
-                .build();
+                                    @Override
+                                    public void onException(@Nonnull ExceptionEvent event) {
+                                        Sentry.captureException(event.getCause());
+                                    }
+                                })
+                        .build();
 
         commandRegister = injector.getInstance(CommandRegister.class);
 

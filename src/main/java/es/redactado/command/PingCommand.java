@@ -30,10 +30,13 @@ public class PingCommand implements BaseSlashCommand {
         long gatewayPing = event.getJDA().getGatewayPing();
 
         // Send a detailed response with both response time and gateway ping
-        event.getHook().sendMessage(String.format(
-                "`🏓` Pong!\n" +
-                        "`⏱️` Response time: %d ms\n" +
-                        "`🌐` Gateway ping: %d ms",
-                responseTime, gatewayPing)).queue();
+        event.getHook()
+                .sendMessage(
+                        String.format(
+                                "`🏓` Pong!\n"
+                                        + "`⏱️` Response time: %d ms\n"
+                                        + "`🌐` Gateway ping: %d ms",
+                                responseTime, gatewayPing))
+                .queue();
     }
 }
