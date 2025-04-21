@@ -3,7 +3,7 @@ plugins {
     id("com.gradleup.shadow") version "9.0.0-beta4"
     id("application")
     id("io.sentry.jvm.gradle") version "5.3.0"
-    id("com.diffplug.spotless") version "7.0.2"
+    id("com.diffplug.spotless") version "7.0.3"
 }
 
 group = "es.redactado"
