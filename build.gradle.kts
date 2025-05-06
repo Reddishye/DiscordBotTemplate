@@ -22,7 +22,7 @@ dependencies {
     implementation("io.github.cdimascio:dotenv-java:3.2.0")
 
     implementation("ch.qos.logback:logback-classic:1.5.18")
-    implementation("org.slf4j:slf4j-api:2.0.9")
+    implementation("org.slf4j:slf4j-api:2.0.17")
     implementation("org.fusesource.jansi:jansi:2.4.2")
 
     implementation("com.github.nguyenq:tess4j:tess4j-5.15.0") // Tessarect OCR
