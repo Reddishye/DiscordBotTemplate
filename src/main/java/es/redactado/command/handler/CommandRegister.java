@@ -9,6 +9,9 @@ import es.redactado.command.type.BaseMessageContextCommand;
 import es.redactado.command.type.BaseSlashCommand;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
+
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
@@ -47,7 +50,32 @@ public class CommandRegister {
                         .maximumSize(100)
                         .build();
 
-        addCommand(injector.getInstance(PingCommand.class));
+        for (Class<? extends BaseSlashCommand> commandClass : es.redactado.config.Commands.SLASH_COMMANDS) {
+            try {
+                BaseSlashCommand command = injector.getInstance(commandClass);
+                // Run the consumer for the command
+                Consumer<BaseSlashCommand> consumer = es.redactado.config.Commands.SLASH_COMMAND_CONSUMERS;
+                consumer.accept(command);
+                addCommand(command);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to register command: " + commandClass, e);
+            }
+        }
+
+        for (Class<?> commandClass : es.redactado.config.Commands.MESSAGE_CONTEXT_COMMANDS) {
+            try {
+                BaseMessageContextCommand command =
+                        (BaseMessageContextCommand) injector.getInstance(commandClass);
+                // Run the consumer for the command
+                Consumer<BaseMessageContextCommand> consumer =
+                        es.redactado.config.Commands.MESSAGE_CONTEXT_COMMAND_CONSUMERS;
+
+                consumer.accept(command);
+                addCommand(command);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to register command: " + commandClass, e);
+            }
+        }
     }
 
     public BaseSlashCommand getSlashCommand(String name) {
@@ -122,6 +150,10 @@ public class CommandRegister {
     }
 
     public List<ListenerAdapter> getListeners() {
+        if (!es.redactado.config.Commands.REGISTER_LISTENERS) {
+            return Collections.emptyList();
+        }
+
         List<ListenerAdapter> listeners = new ArrayList<>();
         for (BaseSlashCommand command : this.slashCommands.values()) {
             if (command instanceof ListenerAdapter) {
