@@ -19,6 +19,7 @@ dependencies {
     implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
     implementation("com.google.inject:guice:7.0.0") // Dependency Injection
     implementation("com.github.ben-manes.caffeine:caffeine:3.2.0")
+    implementation("com.github.ben-manes.caffeine:jcache:3.2.0")
     implementation("io.github.cdimascio:dotenv-java:3.2.0")
 
     implementation("ch.qos.logback:logback-classic:1.5.18")
