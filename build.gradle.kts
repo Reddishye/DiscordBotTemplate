@@ -15,7 +15,7 @@ repositories {
 }
 
 dependencies {
-    implementation("net.dv8tion:JDA:5.5.1") { exclude(module = "opus-java") } // Discord Integration
+    implementation("com.github.freya022:JDA:4a9d724a21") { exclude(module = "opus-java") }
     implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
     implementation("com.google.inject:guice:7.0.0") // Dependency Injection
     implementation("com.github.ben-manes.caffeine:caffeine:3.2.0")
@@ -26,6 +26,20 @@ dependencies {
     implementation("org.fusesource.jansi:jansi:2.4.2")
 
     implementation("com.github.nguyenq:tess4j:tess4j-5.15.0") // Tessarect OCR
+
+    // Hibernate ORM
+    implementation(platform("org.hibernate.orm:hibernate-platform:7.0.0.CR1"))
+    implementation("org.hibernate.orm:hibernate-hikaricp")
+    implementation("org.hibernate.orm:hibernate-core")
+    implementation("org.hibernate.orm:hibernate-jcache")
+    implementation("org.hibernate.orm:hibernate-community-dialects") // Used for SQLite dialect
+    implementation("jakarta.transaction:jakarta.transaction-api")
+
+    // Database Drivers
+    implementation("com.zaxxer:HikariCP:3.6.0")
+    implementation("org.mariadb.jdbc:mariadb-java-client:3.5.3")
+    implementation("org.xerial:sqlite-jdbc:3.49.1.0")
+    implementation("com.h2database:h2:2.3.232")
 }
 
 application {
