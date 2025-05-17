@@ -16,4 +16,13 @@
         <appender-ref ref="STDOUT" />
         <appender-ref ref="Sentry" />
     </root>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="FILE" />
+    </root>
+
+    <logger name="es.redactado.database" level="INFO" />
+    <logger name="org.hibernate" level="WARN" />
+    <logger name="org.hibernate.SQL" level="INFO" />
 </configuration>
