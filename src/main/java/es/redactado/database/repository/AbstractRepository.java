@@ -17,9 +17,8 @@ public abstract class AbstractRepository<T, ID extends Serializable> {
     public AbstractRepository(DatabaseManager databaseManager) {
         this.databaseManager = databaseManager;
         this.entityClass =
-                (Class<T>)
-                        ((ParameterizedType) getClass().getGenericSuperclass())
-                                .getActualTypeArguments()[0];
+                (Class<T>) ((ParameterizedType) getClass().getGenericSuperclass())
+                        .getActualTypeArguments()[0];
     }
 
     public Optional<T> findById(ID id) {
@@ -57,10 +56,7 @@ public abstract class AbstractRepository<T, ID extends Serializable> {
             transaction.commit();
             return mergedEntity;
         } catch (Exception e) {
-            if (transaction != null
-                    && transaction.isActive()
-                    && session != null
-                    && session.isOpen()) {
+            if (transaction != null && transaction.isActive() && session.isOpen()) {
                 transaction.rollback();
             }
             throw e;
@@ -77,13 +73,11 @@ public abstract class AbstractRepository<T, ID extends Serializable> {
         try {
             session = databaseManager.getSession();
             transaction = session.beginTransaction();
-            session.remove(entity);
+            T managed = session.contains(entity) ? entity : session.merge(entity);
+            session.remove(managed);
             transaction.commit();
         } catch (Exception e) {
-            if (transaction != null
-                    && transaction.isActive()
-                    && session != null
-                    && session.isOpen()) {
+            if (transaction != null && transaction.isActive() && session.isOpen()) {
                 transaction.rollback();
             }
             throw e;
