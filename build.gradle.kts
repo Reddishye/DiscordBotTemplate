@@ -15,7 +15,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.freya022:JDA:4a9d724a21") { exclude(module = "opus-java") }
+    implementation("com.github.freya022:JDA:4.3.0") { exclude(module = "opus-java") }
     implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
     implementation("com.google.inject:guice:7.0.0") // Dependency Injection
     implementation("com.github.ben-manes.caffeine:caffeine:3.2.0")
