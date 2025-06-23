@@ -29,7 +29,7 @@ dependencies {
     implementation("com.github.nguyenq:tess4j:tess4j-5.15.0") // Tessarect OCR
 
     // Hibernate ORM
-    implementation(platform("org.hibernate.orm:hibernate-platform:7.0.0.CR2"))
+    implementation(platform("org.hibernate.orm:hibernate-platform:7.0.3.Final"))
     implementation("org.hibernate.orm:hibernate-hikaricp")
     implementation("org.hibernate.orm:hibernate-core")
     implementation("org.hibernate.orm:hibernate-jcache")
