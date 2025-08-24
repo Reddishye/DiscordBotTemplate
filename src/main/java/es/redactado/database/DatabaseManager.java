@@ -30,6 +30,16 @@ public class DatabaseManager {
         String dbPassword = dotenv.get("DB_PASSWORD", "");
         String dbPath = dotenv.get("DB_PATH", "./database");
 
+        if (dbType.equals("SQLITE")) {
+            java.nio.file.Path dir = java.nio.file.Paths.get(dbPath);
+            try {
+                java.nio.file.Files.createDirectories(dir);
+            } catch (java.io.IOException ex) {
+                logger.error("Unable to create directory for database: {}", dir, ex);
+                throw new ExceptionInInitializerError("Unable to create directory for database: " + ex.getMessage());
+            }
+        }
+
         logger.info("Configuring database connection for type: {}", dbType);
 
         HibernatePersistenceConfiguration configuration =
@@ -111,7 +121,7 @@ public class DatabaseManager {
         configuration.property("hibernate.cache.use_query_cache", "true");
         configuration.property(
                 "hibernate.cache.region.factory_class",
-                "org.hibernate.cache.jcache.JCacheRegionFactory");
+                "org.hibernate.cache.jcache.internal.JCacheRegionFactory");
         configuration.property(
                 "hibernate.javax.cache.provider",
                 "com.github.benmanes.caffeine.jcache.spi.CaffeineCachingProvider");
