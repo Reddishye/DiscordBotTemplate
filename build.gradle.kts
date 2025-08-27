@@ -26,7 +26,7 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.17")
     implementation("org.fusesource.jansi:jansi:2.4.2")
 
-    implementation("com.github.nguyenq:tess4j:tess4j-5.15.0") // Tessarect OCR
+    implementation("com.github.nguyenq:tess4j:tess4j-5.16.0") // Tessarect OCR
 
     // Hibernate ORM
     implementation(platform("org.hibernate.orm:hibernate-platform:7.1.0.Final"))
