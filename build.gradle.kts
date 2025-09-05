@@ -18,8 +18,8 @@ dependencies {
     implementation("net.dv8tion:JDA:6.0.0-rc.3) { exclude(module = "opus-java") }
     implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
     implementation("com.google.inject:guice:7.0.0") // Dependency Injection
-    implementation("com.github.ben-manes.caffeine:caffeine:3.2.0")
-    implementation("com.github.ben-manes.caffeine:jcache:3.2.0")
+    implementation("com.github.ben-manes.caffeine:caffeine:v3.2.2")
+    implementation("com.github.ben-manes.caffeine:jcache:v3.2.2")
     implementation("io.github.cdimascio:dotenv-java:3.2.0")
 
     implementation("ch.qos.logback:logback-classic:1.5.18")
