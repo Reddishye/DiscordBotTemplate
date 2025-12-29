@@ -22,7 +22,7 @@ dependencies {
     implementation("com.github.ben-manes.caffeine:jcache:v3.2.2")
     implementation("io.github.cdimascio:dotenv-java:3.2.0")
 
-    implementation("ch.qos.logback:logback-classic:1.5.18")
+    implementation("ch.qos.logback:logback-classic:1.5.23")
     implementation("org.slf4j:slf4j-api:2.0.17")
     implementation("org.fusesource.jansi:jansi:2.4.2")
 
