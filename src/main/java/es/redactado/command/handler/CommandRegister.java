@@ -10,8 +10,6 @@ import es.redactado.command.type.BaseSlashCommand;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
-
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
@@ -50,11 +48,13 @@ public class CommandRegister {
                         .maximumSize(100)
                         .build();
 
-        for (Class<? extends BaseSlashCommand> commandClass : es.redactado.config.Commands.SLASH_COMMANDS) {
+        for (Class<? extends BaseSlashCommand> commandClass :
+                es.redactado.config.Commands.SLASH_COMMANDS) {
             try {
                 BaseSlashCommand command = injector.getInstance(commandClass);
                 // Run the consumer for the command
-                Consumer<BaseSlashCommand> consumer = es.redactado.config.Commands.SLASH_COMMAND_CONSUMERS;
+                Consumer<BaseSlashCommand> consumer =
+                        es.redactado.config.Commands.SLASH_COMMAND_CONSUMERS;
                 consumer.accept(command);
                 addCommand(command);
             } catch (Exception e) {
