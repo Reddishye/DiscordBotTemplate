@@ -1,5 +1,7 @@
 package es.redactado.database;
 
+import static es.redactado.config.Database.ENTITIES;
+
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import es.redactado.database.model.*;
@@ -10,8 +12,6 @@ import org.hibernate.jpa.HibernatePersistenceConfiguration;
 import org.hibernate.tool.schema.Action;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static es.redactado.config.Database.ENTITIES;
 
 @Singleton
 public class DatabaseManager {
@@ -36,7 +36,8 @@ public class DatabaseManager {
                 java.nio.file.Files.createDirectories(dir);
             } catch (java.io.IOException ex) {
                 logger.error("Unable to create directory for database: {}", dir, ex);
-                throw new ExceptionInInitializerError("Unable to create directory for database: " + ex.getMessage());
+                throw new ExceptionInInitializerError(
+                        "Unable to create directory for database: " + ex.getMessage());
             }
         }
 

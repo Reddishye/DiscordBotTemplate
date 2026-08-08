@@ -8,7 +8,6 @@ import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-
 /**
  * Base class for all domain entities. This class contains common fields such as id, createdAt, and
  * updatedAt.

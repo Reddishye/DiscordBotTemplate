@@ -12,12 +12,11 @@ public class Services {
      * Must NOT depend on ShardManager.
      */
     public static final List<Class<? extends IService>> INFRASTRUCTURE_SERVICES =
-            List.of(TaskManager::class);
+            List.of(TaskManager.class);
 
     /**
      * Started after JDA fires its first ReadyEvent.
      * Safe for: anything that needs ShardManager, guild data, or Discord API.
      */
-    public static final List<Class<? extends IService>> BUSINESS_SERVICES =
-            List.of();
+    public static final List<Class<? extends IService>> BUSINESS_SERVICES = List.of();
 }

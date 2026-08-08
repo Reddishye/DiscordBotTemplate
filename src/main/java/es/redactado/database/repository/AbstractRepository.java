@@ -17,8 +17,9 @@ public abstract class AbstractRepository<T, ID extends Serializable> {
     public AbstractRepository(DatabaseManager databaseManager) {
         this.databaseManager = databaseManager;
         this.entityClass =
-                (Class<T>) ((ParameterizedType) getClass().getGenericSuperclass())
-                        .getActualTypeArguments()[0];
+                (Class<T>)
+                        ((ParameterizedType) getClass().getGenericSuperclass())
+                                .getActualTypeArguments()[0];
     }
 
     public Optional<T> findById(ID id) {

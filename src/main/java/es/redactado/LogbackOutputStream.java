@@ -1,12 +1,11 @@
 package es.redactado;
 
 import ch.qos.logback.classic.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.text.Normalizer;
+import org.slf4j.LoggerFactory;
 
 public class LogbackOutputStream extends ByteArrayOutputStream {
     private final String lineSeparator = System.lineSeparator();
