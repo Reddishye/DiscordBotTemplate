@@ -564,6 +564,72 @@ These are already correct and stay unchanged:
 - `MAX_CUSTOM_ID_LENGTH = 100`
 - `MAX_MEDIA_GALLERY_ITEMS = 10`
 
+### 3.5 Components added in T10
+
+Five components arrived after the port, each in `es.redactado.menu.view`, each
+routed through the same action table as a class-based menu. Limits are enforced at
+construction except where a limit cannot be known until render, which is said so
+on the method.
+
+### `Nav`
+
+Navigation buttons: `back`, `push`, `replace`, `root`. All four use the built-in
+`nav` action, so no menu declares or wires them, and the id carries the mode and
+target rather than a handler. Rendered in the preset's `SECONDARY` style; only
+`back()` takes its label from the bundles.
+
+```java
+Row.of(Nav.back(), Nav.push("details", "Details"))
+```
+
+### `Pager<T>`
+
+One page of a list, with previous and next controls. The page lives in the session
+under `pager:<id>`, and the stored page is clamped on read rather than trusted.
+Limits: 1 to 20 items per page; the id must match `[a-z0-9_]{1,20}` so it survives
+custom-id encoding.
+
+```java
+Pager.of("users", users, 5, user -> Field.of(user.name(), user.tag()))
+```
+
+### `Confirm`
+
+A prompt with a yes and a no, rendered as a view rather than a flag on the view
+that triggered it, so cancel is a plain `Nav.back()` and has no state to unwind.
+`.danger()` asks for the destructive role.
+
+```java
+Confirm.of(Text.of(labels.deletePrompt()), "reallyDelete", entityId).danger()
+```
+
+### `SelectMenu`
+
+A string select. Value first, label second, which is the reverse of JDA's own
+`addOption` and deliberate: the value is what a handler receives. Limits: 25
+options, 100 characters for the value, label, description and placeholder, and the
+encoded id stays within 100. A duplicate value, or a default that matches no
+option, is refused, because Discord drops both silently. A select must be the only
+item in its row.
+
+```java
+Row.of(SelectMenu.of("assign", "Pick a role").option("owner", "Owner").selected("owner"))
+```
+
+### `ModalForm`
+
+A modal built from labelled inputs, the one mutable type here: configured by the
+calls that follow `shortField` or `paragraph`, built once, discarded. Limits: 5
+fields, 45 characters for the title and for each label, 100 for a field id and for
+a placeholder, 4000 for a value, and a form with no fields is refused. A modal must
+be the first and only response, so it belongs behind `Ack.MODAL`.
+
+```java
+ModalForm form = ModalForm.create(ctx, "apply", "Apply");
+form.shortField("name", "Name").required(true);
+showModal(ctx, form.build());
+```
+
 ## 4. Open questions
 
 Recorded in `NOTES.md` rather than resolved unilaterally.
