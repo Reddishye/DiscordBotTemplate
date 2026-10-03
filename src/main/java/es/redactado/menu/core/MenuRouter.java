@@ -51,18 +51,24 @@ public final class MenuRouter implements AutoCloseable {
 
     private final Map<String, Registered> menus = new ConcurrentHashMap<>();
     private final MenuExecutor executor;
+    private final SessionStore sessions;
     private final InteractionGuard guard = new InteractionGuard();
+    private final Navigator navigator;
 
     /** A menu paired with the immutable action table built from it. */
     private record Registered(Menu menu, ActionTable table) {}
 
     /**
-     * Creates a router that runs handlers on the given executor.
+     * Creates a router that runs handlers on the given executor and keeps
+     * navigation history in the given store.
      *
      * @param executor the executor that runs handler bodies
+     * @param sessions the store holding one session per menu message
      */
-    public MenuRouter(MenuExecutor executor) {
+    public MenuRouter(MenuExecutor executor, SessionStore sessions) {
         this.executor = executor;
+        this.sessions = sessions;
+        this.navigator = new Navigator(this::get, sessions);
     }
 
     /**
@@ -173,7 +179,10 @@ public final class MenuRouter implements AutoCloseable {
                 () ->
                         action.get()
                                 .handler()
-                                .handle(BaseContext.fromButton(event, parsed.get()), event));
+                                .handle(
+                                        BaseContext.fromButton(
+                                                event, parsed.get(), sessions, navigator),
+                                        event));
         return true;
     }
 
@@ -219,7 +228,10 @@ public final class MenuRouter implements AutoCloseable {
                 () ->
                         action.get()
                                 .handler()
-                                .handle(BaseContext.fromModal(event, parsed.get()), event));
+                                .handle(
+                                        BaseContext.fromModal(
+                                                event, parsed.get(), sessions, navigator),
+                                        event));
         return true;
     }
 
@@ -361,5 +373,6 @@ public final class MenuRouter implements AutoCloseable {
     @Override
     public void close() {
         executor.close();
+        sessions.close();
     }
 }

@@ -128,6 +128,10 @@ core  ->  api
 view  ->  api, core
 ```
 
+`Session`, `NavEntry`, and `NavigationMode` sit in `api` rather than `core`
+because `MenuContext` exposes all three. Moving them keeps the invariant above
+intact instead of making `api` depend on the dispatcher.
+
 `core` also holds `MenuExecutor`, which wraps an `ExecutorService`, and
 `InteractionGuard`, a `ConcurrentHashMap.newKeySet()` of message ids currently
 being handled. Both were added in T4.
@@ -161,10 +165,12 @@ src/main/java/es/redactado/menu/
   api/                            Menu, MenuContext, MenuComponent, Ack,
                                    ActionTable, ButtonAction, ModalAction,
                                    ButtonHandler, ModalHandler, Done, Limits,
-                                   UserFacingException, exceptions
+                                   UserFacingException, NavEntry, Session,
+                                   NavigationMode, exceptions
   core/                           MenuRouter, MenuExecutor, InteractionGuard,
-                                   ComponentId, Replies, ErrorReply, navigation,
-                                   AbstractMenu, BaseContext
+                                   SessionStore, SessionConfig, Navigator,
+                                   ComponentId, Replies, ErrorReply,
+                                   NavigationAction, AbstractMenu, BaseContext
   view/                           MenuBuilder, components, Limits, Validator
   RowItem.java                   Action-row children: buttons and selects
   Accessory.java                 Section accessories: buttons and thumbnails
@@ -305,7 +311,7 @@ is the final path; the "Name" column is the final type name where it differs.
 | `api/Menu.java` | `api/Menu.java` | `Menu` | **T3**: `onButton`/`onModal` replaced by `actions(ActionTable.Builder)` |
 | `api/NavigationAware.java` | `api/NavigationAware.java` | `NavigationAware` | becomes the `onEnter`/`onLeave` hook in T5, or is removed |
 | `api/Renderable.java` | `api/Renderable.java` | `Renderable` | unused, removed in T14 |
-| `base/AbstractMenu.java` | `core/AbstractMenu.java` | `AbstractMenu` | **T3** registers the built-in `nav` action; replaced by the dispatcher in T4 |
+| `base/AbstractMenu.java` | `core/AbstractMenu.java` | `AbstractMenu` | **T3** registers the built-in `nav` action; **T5** the nav action delegates to `Navigator` |
 | `base/BaseContext.java` | `core/BaseContext.java` | `BaseContext` | becomes the `MenuContext` implementation in T5 |
 | `builder/MenuBuilder.java` | `view/MenuBuilder.java` | `MenuBuilder` | made preset-aware in T10 |
 | `component/ActionButton.java` | `view/ActionButton.java` | `ActionButton` | broken cast, fixed in T10 |
@@ -323,8 +329,8 @@ is the final path; the "Name" column is the final type name where it differs.
 | `exception/MenuException.java` | `api/MenuException.java` | `MenuException` | kept as the base type |
 | `exception/MenuNotFoundException.java` | `api/MenuNotFoundException.java` | `MenuNotFoundException` | kept |
 | `exception/StateNotFoundException.java` | `api/StateNotFoundException.java` | `StateNotFoundException` | replaced by `UserFacingException` in T5 |
-| `navigation/NavigationAction.java` | `core/NavigationAction.java` | `NavigationAction` | absorbed into the T5 navigation API |
-| `navigation/NavigationMode.java` | `core/NavigationMode.java` | `NavigationMode` | reduced to push/pop/replace/root in T5 |
+| `navigation/NavigationAction.java` | `core/NavigationAction.java` | `NavigationAction` | **T5** parses mode and target into `ctx.navigate` |
+| `navigation/NavigationMode.java` | `api/NavigationMode.java` | `NavigationMode` | **T5** moved to `api`, reduced to `PUSH`, `REPLACE`, `BACK`, `ROOT` |
 | `validation/Limits.java` | `api/Limits.java` | `Limits` | moved out of `view` in prep; extended with the 6.4.2 limits in T10 |
 | `validation/ValidationResult.java` | `view/ValidationResult.java` | `ValidationResult` | rewritten as a record in T10 |
 | `validation/Validator.java` | `view/Validator.java` | `Validator` | strict in tests, lenient in production, in T10 |
@@ -343,6 +349,10 @@ demonstrate the framework. Its bot-specific logic is not copied: neither the
 
 Carried over from the source, and each one contradicts a rule of the plan:
 
+- The back stack and state map lived on the per-interaction context, so both were
+  discarded when the click that created them returned. Going back therefore always
+  found an empty stack, and pagination always reset to page one.
+  **Fixed in T5:** both moved to a per-message `Session`.
 - `ComponentId.decode` used `String.split`, a regex, and a per-call `ArrayList`.
   Section 3 requires `indexOf`/`substring` and a prebuilt map. **Fixed in T2.**
 - `ComponentId.decode` returned `null` for a bad prefix, so callers could not tell

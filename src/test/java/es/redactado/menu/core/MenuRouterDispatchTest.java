@@ -74,7 +74,8 @@ class MenuRouterDispatchTest {
     }
 
     private static MenuRouter router(ButtonHandler handler, boolean shared) {
-        MenuRouter router = new MenuRouter(MenuExecutor.virtual());
+        MenuRouter router =
+                new MenuRouter(MenuExecutor.virtual(), new SessionStore(SessionConfig.defaults()));
         router.register("m", new SimpleMenu(handler, shared));
         return router;
     }
@@ -355,7 +356,9 @@ class MenuRouterDispatchTest {
             ExecutorService rejecting = mock(ExecutorService.class);
             doThrow(new RejectedExecutionException()).when(rejecting).execute(any(Runnable.class));
 
-            MenuRouter router = new MenuRouter(MenuExecutor.of(rejecting));
+            MenuRouter router =
+                    new MenuRouter(
+                            MenuExecutor.of(rejecting), new SessionStore(SessionConfig.defaults()));
             router.register("m", new SimpleMenu(instantHandler(), false));
             ButtonInteractionEvent event = clickFrom(1000L, CLICKER);
 
@@ -411,8 +414,12 @@ class MenuRouterDispatchTest {
 
         private MenuContext contextWith(String param) {
             List<String> params = param == null ? List.of() : List.of(param);
+            SessionStore store = new SessionStore(SessionConfig.defaults());
             return BaseContext.fromButton(
-                    JdaMocks.button("menu:m:go", false), new ComponentId("m", "go", params));
+                    JdaMocks.button("menu:m:go", false),
+                    new ComponentId("m", "go", params),
+                    store,
+                    new Navigator(id -> null, store));
         }
     }
 }

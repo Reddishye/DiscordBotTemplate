@@ -2,6 +2,8 @@ package es.redactado.menu.api;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
@@ -12,10 +14,10 @@ import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 /**
  * Request-scoped context for a single menu render or interaction.
  *
- * <p>Carries the parsed action data, the Discord entities involved, and the
- * per-event state of the source implementation. The state and back-stack
- * accessors are retained for the port and are expected to move into a
- * message-scoped session.
+ * <p>Carries the parsed action data, the Discord entities involved, and a handle
+ * to the {@link Session} for the message, which is where navigation history and
+ * menu state live. State deliberately does not live here: a context is discarded
+ * when its handler returns, so anything kept on it would be lost between clicks.
  */
 public interface MenuContext {
 
@@ -146,59 +148,49 @@ public interface MenuContext {
     void deferEdit();
 
     /**
-     * Reads a state value.
+     * Id of the menu message this interaction belongs to.
      *
-     * @param key state key
-     * @param <T> value type
-     * @return the stored value, or {@code null} when absent
+     * @return the message id, or empty for a modal that was not opened from a
+     *     message
      */
-    <T> T state(String key);
+    OptionalLong messageId();
 
     /**
-     * Stores a state value.
+     * The session for this message, created on first use.
      *
-     * @param key state key
-     * @param value value to store
-     * @param <T> value type
+     * <p>State written here survives between clicks, which is the whole point of
+     * moving it off the context.
+     *
+     * @return the session, never null
      */
-    <T> void setState(String key, T value);
+    Session session();
 
     /**
-     * Removes a state value.
+     * The session for this message, without creating one.
      *
-     * @param key state key
+     * @return the session, or empty when none exists or it expired
      */
-    void removeState(String key);
-
-    /** Removes every state value held by this context. */
-    void clearState();
+    Optional<Session> findSession();
 
     /**
-     * Increments an integer state value, treating an absent key as zero.
+     * Moves to another view, using the session for history.
      *
-     * @param key state key
-     * @return the value after incrementing
+     * @param mode how to move
+     * @param targetMenuId the menu to show, ignored by {@link NavigationMode#BACK}
+     * @return a completed future
+     * @throws UserFacingException if the target menu is not registered
      */
-    int increment(String key);
+    CompletableFuture<Void> navigate(NavigationMode mode, String targetMenuId);
 
     /**
-     * Pushes a context onto the back stack.
+     * A context addressing a different view of the same message.
      *
-     * @param previous the context to remember
-     */
-    void push(MenuContext previous);
-
-    /**
-     * Pops the most recent context off the back stack.
+     * <p>Used to re-render a remembered view while going back. The interaction,
+     * user, guild, and session are shared; only the menu, action, and parameters
+     * change.
      *
-     * @return the previous context, or empty when the stack is empty
+     * @param entry the view to address
+     * @return a context for that view
      */
-    Optional<MenuContext> pop();
-
-    /**
-     * Reports whether a previous context is on the back stack.
-     *
-     * @return {@code true} when the stack is not empty
-     */
-    boolean hasPrevious();
+    MenuContext at(NavEntry entry);
 }

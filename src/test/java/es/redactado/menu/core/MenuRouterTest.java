@@ -72,7 +72,7 @@ class MenuRouterTest {
 
     @BeforeEach
     void setUp() {
-        router = new MenuRouter(MenuExecutor.virtual());
+        router = new MenuRouter(MenuExecutor.virtual(), new SessionStore(SessionConfig.defaults()));
         editHandler = mock(ButtonHandler.class);
         replyHandler = mock(ButtonHandler.class);
         modalHandler = mock(ButtonHandler.class);

@@ -1,5 +1,6 @@
 package es.redactado.menu.api;
 
+import java.util.List;
 import net.dv8tion.jda.api.components.container.Container;
 
 /**
@@ -22,6 +23,20 @@ public interface Menu {
      * @return the rendered container
      */
     Container render(MenuContext ctx);
+
+    /**
+     * The view this menu shows when it is opened or navigated to without history.
+     *
+     * <p>A menu's {@link #render(MenuContext)} must therefore handle the action
+     * {@code home} and treat it as its initial view, since navigation renders
+     * through this entry rather than through a click.
+     *
+     * @param ctx the context of the current interaction
+     * @return the entry describing this menu's initial view
+     */
+    default NavEntry home(MenuContext ctx) {
+        return new NavEntry(id(), "home", List.of());
+    }
 
     /**
      * Whether this menu is visible to and usable by everyone.

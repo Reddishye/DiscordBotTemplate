@@ -51,7 +51,7 @@ public class SectionList<T> implements MenuComponent {
         }
 
         int totalPages = (items.size() + pageSize - 1) / pageSize;
-        Integer rawPage = ctx.state("page_" + stateKey);
+        Integer rawPage = ctx.session().state("page_" + stateKey, Integer.class).orElse(null);
         int page = rawPage != null ? Math.min(rawPage, totalPages - 1) : 0;
         int from = page * pageSize;
         int to = Math.min(from + pageSize, items.size());

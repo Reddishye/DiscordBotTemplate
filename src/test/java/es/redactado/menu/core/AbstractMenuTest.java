@@ -2,10 +2,7 @@ package es.redactado.menu.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,8 +10,8 @@ import es.redactado.menu.api.Ack;
 import es.redactado.menu.api.ActionTable;
 import es.redactado.menu.api.Done;
 import es.redactado.menu.api.MenuContext;
+import es.redactado.menu.api.NavigationMode;
 import java.util.Optional;
-import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
@@ -114,19 +111,6 @@ class AbstractMenuTest {
     }
 
     @Test
-    @DisplayName("handleBack throws when the interaction is not acknowledged")
-    void handleBackNeedsAcknowledgement() {
-        MenuContext ctx = mock(MenuContext.class);
-        ButtonInteractionEvent event = JdaMocks.button("menu:bare:nav", false);
-
-        AbstractMenu menu = new BareMenu();
-
-        assertThatThrownBy(() -> menu.handleBack(ctx, event))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ack mode");
-    }
-
-    @Test
     @DisplayName("showModal throws when the interaction is already acknowledged")
     void showModalNeedsUnacknowledged() {
         ButtonInteractionEvent acknowledged = JdaMocks.button("menu:bare:open", true);
@@ -148,40 +132,37 @@ class AbstractMenuTest {
     }
 
     @Test
-    @DisplayName("handleBack sends an ephemeral hook message when there is nothing to go back to")
-    void handleBackWithoutPrevious() {
+    @DisplayName("the nav handler delegates the parsed mode and target to the context")
+    void navHandlerDelegates() {
         MenuContext ctx = mock(MenuContext.class);
-        when(ctx.pop()).thenReturn(Optional.empty());
-        ButtonInteractionEvent event = JdaMocks.button("menu:bare:nav", true);
-
-        new BareMenu().handleBack(ctx, event);
-
-        verify(event.getHook()).sendMessage(anyString());
-    }
-
-    @Test
-    @DisplayName("handleBack edits the original message when there is a previous menu")
-    void handleBackWithPrevious() {
-        MenuContext ctx = mock(MenuContext.class);
-        MenuContext previous = mock(MenuContext.class);
-        when(ctx.pop()).thenReturn(Optional.of(previous));
-        ButtonInteractionEvent event = JdaMocks.button("menu:bare:nav", true);
-
-        new BareMenu().handleBack(ctx, event);
-
-        verify(event.getHook()).editOriginalComponents(any(MessageTopLevelComponent[].class));
-        verify(event.getHook(), never()).sendMessage(anyString());
-    }
-
-    @Test
-    @DisplayName("nav handler is bound so it returns a completed future")
-    void navHandlerCompletes() {
-        MenuContext ctx = mock(MenuContext.class);
-        when(ctx.pop()).thenReturn(Optional.empty());
+        when(ctx.requireString(0)).thenReturn("push");
+        when(ctx.param(1)).thenReturn(Optional.of("other"));
+        when(ctx.navigate(NavigationMode.PUSH, "other")).thenReturn(Done.NOW);
 
         ActionTable table = tableOf(new BareMenu());
         var handler = table.button("nav").orElseThrow().handler();
 
         assertThat(handler.handle(ctx, JdaMocks.button("menu:bare:nav", true))).isEqualTo(Done.NOW);
+        verify(ctx).navigate(NavigationMode.PUSH, "other");
+    }
+
+    @Test
+    @DisplayName("a nav button id round trips through the action codec")
+    void navButtonIdRoundTrips() {
+        String id = NavigationAction.buttonId("bare", NavigationMode.PUSH, "other");
+
+        ComponentId parsed = ComponentId.decode(id).orElseThrow();
+
+        assertThat(parsed.menuId()).isEqualTo("bare");
+        assertThat(parsed.action()).isEqualTo("nav");
+        assertThat(parsed.params()).containsExactly("push", "other");
+    }
+
+    @Test
+    @DisplayName("a back button id carries no target")
+    void backButtonIdOmitsTarget() {
+        String id = NavigationAction.buttonId("bare", NavigationMode.BACK, "");
+
+        assertThat(ComponentId.decode(id).orElseThrow().params()).containsExactly("back");
     }
 }

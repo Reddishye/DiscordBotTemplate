@@ -611,6 +611,83 @@ cannot currently be localized. T9 replaces the string with a key resolved throug
 yours.", "The bot is busy. Try again.", "Unknown action.", and "Something went
 wrong (ref: ...)."
 
+### Three types had to move from `core` to `api`
+
+The plan listed `Session` and `NavEntry` as `core` types. `NavEntry` was flagged for
+a move, but two more turned out to need the same treatment for the same reason:
+`MenuContext` is in `api`, and the methods T5 adds to it return these types.
+
+| Type | Moved because |
+| --- | --- |
+| `NavEntry` | `Menu#home(MenuContext)` returns it, so `api.Menu` needs it |
+| `Session` | `MenuContext.session()` and `findSession()` return it |
+| `NavigationMode` | `MenuContext.navigate(NavigationMode, String)` takes it |
+
+Without these moves `api` would import `core`, undoing the direction the prep
+commit established (`api` -> nothing, `core` -> `api`, `view` -> `api, core`). The
+invariant is preserved and verified: `grep '^import es.redactado.menu.core' api/`
+and `grep '^import es.redactado.menu.view' core/` both return nothing.
+
+`SessionConfig` and `SessionStore` stay in `core`, because only the store uses them
+and neither appears in a `MenuContext` signature.
+
+### `Navigator` does not call `Validator`
+
+The plan says showing a view should "validate with `Validator`". That is not
+implemented, because it would reintroduce `core -> view`, which the prep commit
+removed and which section 4's own package assignment forbids: section 4 puts
+validation in `view`, and `Navigator` is in `core`.
+
+Validation still happens for every container built the documented way, because
+`MenuBuilder.build` calls `Validator.verify` itself. What is *not* guaranteed is a
+menu that assembles a `Container` by hand and skips the builder.
+
+**Default.** Leave it. T10 rewrites the view layer and is the right place to make
+validation a mandatory single step, at which point every render path passes through
+it by construction.
+
+### `Session.state` used `Class.cast`, which throws instead of yielding empty
+
+A real bug caught by the T5 tests. `Class.cast` throws `ClassCastException` on a
+mismatch, so the documented "empty if the value is another type" behaviour did not
+hold; it surfaced as an exception from a read. Fixed with an `isInstance` check
+before the cast.
+
+### `NavigationMode` replaced two constants and added two
+
+The source enum was `PUSH`, `REPLACE`, `SINGLE_USE`, `POP`. T5 specifies `PUSH`,
+`REPLACE`, `BACK`, `ROOT`. `SINGLE_USE` had no implementation behind it and `POP`
+meant "pop the stack", which is what `BACK` now does properly.
+
+Final enum, in `api`:
+
+```java
+public enum NavigationMode { PUSH, REPLACE, BACK, ROOT }
+```
+
+### `MenuContext.messageId()` was added beyond the plan
+
+`Navigator` is specified to look the session up with `SessionStore.find`, which
+needs a message id, and `session()` needs the same id to create. Rather than have
+`Navigator` reach past the context for it, the id is exposed as
+`OptionalLong messageId()` and both session methods derive from it. It is also the
+primitive a menu author needs to correlate state with a message.
+
+### `NavigationAction` now reports a bad mode as user-facing
+
+The source did `NavigationMode.valueOf(ctx.param(0).orElse("PUSH").toUpperCase())`,
+which threw a bare `IllegalArgumentException` on a malformed component id and
+would have leaked as a generic error. It now throws
+`UserFacingException("Unknown navigation mode.")`, and `BACK` omits the target
+segment from the id rather than encoding an empty one.
+
+### Pagination now actually persists
+
+`SectionList` kept its page in the per-event state map, so every click reset it to
+page one and pagination was broken. It now reads and writes
+`session().state("page_" + key, Integer.class)`, so the page survives between
+clicks. The class is still replaced by `Pager<T>` in T10.
+
 ### Hardcoded emoji that must move into presets
 
 Left in place by T1 because removing them changes rendered output:

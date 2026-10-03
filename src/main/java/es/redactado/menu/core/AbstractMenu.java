@@ -2,10 +2,8 @@ package es.redactado.menu.core;
 
 import es.redactado.menu.api.Ack;
 import es.redactado.menu.api.ActionTable;
-import es.redactado.menu.api.Done;
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
@@ -34,7 +32,6 @@ public abstract class AbstractMenu implements Menu {
 
     private static final String UNACKNOWLEDGED =
             "Action must declare an ack mode that acknowledges the interaction";
-    private static final String NO_PREVIOUS = "No previous menu.";
 
     protected final Logger log = LoggerFactory.getLogger(getClass());
     private final String id;
@@ -55,8 +52,17 @@ public abstract class AbstractMenu implements Menu {
 
     @Override
     public final void actions(ActionTable.Builder table) {
-        table.button(NAV_ACTION, Ack.DEFER_EDIT, this::handleBack);
+        table.button(NAV_ACTION, Ack.DEFER_EDIT, AbstractMenu::navigate);
         declare(table);
+    }
+
+    /**
+     * Handles the built-in {@code nav} action by delegating to the navigator, which
+     * owns the session history.
+     */
+    private static CompletableFuture<Void> navigate(MenuContext ctx, ButtonInteractionEvent event) {
+        NavigationAction navigation = NavigationAction.fromContext(ctx);
+        return ctx.navigate(navigation.mode(), navigation.targetMenuId());
     }
 
     /**
@@ -105,26 +111,6 @@ public abstract class AbstractMenu implements Menu {
             return;
         }
         throw new IllegalStateException("This interaction type cannot open a modal");
-    }
-
-    /**
-     * Handles the built-in {@code nav} action, returning to the previous menu or
-     * saying there is nowhere to go back to.
-     *
-     * @param ctx the context of the current interaction
-     * @param event the JDA button event
-     * @return a completed future
-     * @throws IllegalStateException if the interaction was not acknowledged
-     */
-    protected CompletableFuture<Void> handleBack(MenuContext ctx, ButtonInteractionEvent event) {
-        InteractionHook hook = acknowledgedHook(event);
-        Optional<MenuContext> previous = ctx.pop();
-        if (previous.isEmpty()) {
-            hook.sendMessage(NO_PREVIOUS).setEphemeral(true).queue();
-        } else {
-            hook.editOriginalComponents(render(previous.get())).useComponentsV2().queue();
-        }
-        return Done.NOW;
     }
 
     private static InteractionHook acknowledgedHook(IReplyCallback event) {
