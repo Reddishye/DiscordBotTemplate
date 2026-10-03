@@ -1,7 +1,7 @@
 package es.redactado.menu.view;
 
-import es.redactado.menu.api.Component;
-import es.redactado.menu.api.Context;
+import es.redactado.menu.api.MenuComponent;
+import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.core.ComponentId;
 import java.util.List;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -12,7 +12,7 @@ import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 
 /** A labelled field with optional edit button. Renders Section(Button + TextDisplay). */
-public class Field implements Component {
+public class Field implements MenuComponent {
     private final String label;
     private final String value;
     private final String actionId;
@@ -46,7 +46,7 @@ public class Field implements Component {
     }
 
     @Override
-    public List<ContainerChildComponent> render(Context ctx) {
+    public List<ContainerChildComponent> render(MenuContext ctx) {
         Emoji e =
                 emoji != null
                         ? emoji

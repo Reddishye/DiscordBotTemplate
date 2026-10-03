@@ -12,5 +12,5 @@ public interface Renderable {
      * @param ctx the context of the current interaction
      * @return the rendered component
      */
-    ContainerChildComponent render(Context ctx);
+    ContainerChildComponent render(MenuContext ctx);
 }

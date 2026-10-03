@@ -1,7 +1,7 @@
 package es.redactado.menu.core;
 
-import es.redactado.menu.api.Context;
 import es.redactado.menu.api.Menu;
+import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.MenuNotFoundException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -95,7 +95,8 @@ public class MenuRouter {
     }
 
     /** Render a Container for a menu. */
-    public net.dv8tion.jda.api.components.container.Container render(String menuId, Context ctx) {
+    public net.dv8tion.jda.api.components.container.Container render(
+            String menuId, MenuContext ctx) {
         return get(menuId).render(ctx);
     }
 }

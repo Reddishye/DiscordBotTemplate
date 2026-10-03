@@ -1,7 +1,7 @@
 package es.redactado.menu.view;
 
-import es.redactado.menu.api.Component;
-import es.redactado.menu.api.Context;
+import es.redactado.menu.api.MenuComponent;
+import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.core.ComponentId;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,11 +16,11 @@ import net.dv8tion.jda.api.entities.emoji.Emoji;
  * Paginated list of items with page navigation.
  * Each item is rendered by a renderer function.
  */
-public class SectionList<T> implements Component {
+public class SectionList<T> implements MenuComponent {
 
     @FunctionalInterface
     public interface ItemRenderer<T> {
-        Section render(T item, Context ctx);
+        Section render(T item, MenuContext ctx);
     }
 
     private final List<T> items;
@@ -40,7 +40,7 @@ public class SectionList<T> implements Component {
     }
 
     @Override
-    public List<ContainerChildComponent> render(Context ctx) {
+    public List<ContainerChildComponent> render(MenuContext ctx) {
         var result = new ArrayList<ContainerChildComponent>();
         if (items.isEmpty()) {
             result.add(TextDisplay.of("*No items.*"));

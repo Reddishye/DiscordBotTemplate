@@ -1,12 +1,12 @@
 package es.redactado.menu.view;
 
-import es.redactado.menu.api.Component;
-import es.redactado.menu.api.Context;
+import es.redactado.menu.api.MenuComponent;
+import es.redactado.menu.api.MenuContext;
 import java.util.List;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 
-public class Text implements Component {
+public class Text implements MenuComponent {
     private final String content;
 
     private Text(String content) {
@@ -30,7 +30,7 @@ public class Text implements Component {
     }
 
     @Override
-    public List<ContainerChildComponent> render(Context ctx) {
+    public List<ContainerChildComponent> render(MenuContext ctx) {
         return List.of(TextDisplay.of(content));
     }
 }

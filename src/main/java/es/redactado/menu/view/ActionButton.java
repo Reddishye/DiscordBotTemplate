@@ -1,7 +1,7 @@
 package es.redactado.menu.view;
 
-import es.redactado.menu.api.Component;
-import es.redactado.menu.api.Context;
+import es.redactado.menu.api.MenuComponent;
+import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.core.ComponentId;
 import java.util.List;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -9,7 +9,7 @@ import net.dv8tion.jda.api.components.buttons.ButtonStyle;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 
-public class ActionButton implements Component {
+public class ActionButton implements MenuComponent {
     private final ButtonStyle style;
     private final String action;
     private final String label;
@@ -61,7 +61,7 @@ public class ActionButton implements Component {
     }
 
     @Override
-    public List<ContainerChildComponent> render(Context ctx) {
+    public List<ContainerChildComponent> render(MenuContext ctx) {
         String id = ComponentId.encode(ctx.menuId(), action, extraParams);
         Button btn =
                 label != null && !label.isEmpty()

@@ -17,7 +17,7 @@ import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
  * accessors are retained for the port and are expected to move into a
  * message-scoped session.
  */
-public interface Context {
+public interface MenuContext {
 
     /**
      * Menu identifier, as encoded in the component id.
@@ -166,14 +166,14 @@ public interface Context {
      *
      * @param previous the context to remember
      */
-    void push(Context previous);
+    void push(MenuContext previous);
 
     /**
      * Pops the most recent context off the back stack.
      *
      * @return the previous context, or empty when the stack is empty
      */
-    Optional<Context> pop();
+    Optional<MenuContext> pop();
 
     /**
      * Reports whether a previous context is on the back stack.

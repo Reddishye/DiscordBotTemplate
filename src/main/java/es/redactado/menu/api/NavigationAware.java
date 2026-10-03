@@ -11,7 +11,7 @@ public interface NavigationAware {
      *
      * @param ctx the context of the current interaction
      */
-    default void onNavigate(Context ctx) {}
+    default void onNavigate(MenuContext ctx) {}
 
     /**
      * Called when navigating away from this menu.
@@ -19,7 +19,7 @@ public interface NavigationAware {
      * @param ctx the context of the current interaction
      * @return {@code false} to block the navigation
      */
-    default boolean onNavigateAway(Context ctx) {
+    default boolean onNavigateAway(MenuContext ctx) {
         return true;
     }
 }

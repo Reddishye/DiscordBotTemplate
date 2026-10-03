@@ -1,12 +1,12 @@
 package es.redactado.menu.view;
 
-import es.redactado.menu.api.Component;
-import es.redactado.menu.api.Context;
+import es.redactado.menu.api.MenuComponent;
+import es.redactado.menu.api.MenuContext;
 import java.util.List;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 
-public class LinkButton implements Component {
+public class LinkButton implements MenuComponent {
     private final String url;
     private final String label;
     private final Emoji emoji;
@@ -26,7 +26,7 @@ public class LinkButton implements Component {
     }
 
     @Override
-    public List<ContainerChildComponent> render(Context ctx) {
+    public List<ContainerChildComponent> render(MenuContext ctx) {
         var btn =
                 label != null
                         ? net.dv8tion.jda.api.components.buttons.Button.link(url, label)

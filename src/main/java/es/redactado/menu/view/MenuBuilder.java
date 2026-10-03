@@ -1,7 +1,7 @@
 package es.redactado.menu.view;
 
-import es.redactado.menu.api.Component;
-import es.redactado.menu.api.Context;
+import es.redactado.menu.api.MenuComponent;
+import es.redactado.menu.api.MenuContext;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -10,22 +10,22 @@ import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
 
 /**
- * Fluent builder for constructing a JDA V2 Container from menu Components.
+ * Fluent builder for constructing a JDA V2 Container from menu components.
  *
  * <pre>{@code
- * Container container = MenuBuilder.create("profile", ctx)
+ * Container container = MenuBuilder.create("profile")
  *     .add(Text.of("## Hello"))
  *     .add(Field.of("Name", "John"))
- *     .add(ActionRow.of(Button.primary("edit", "Edit")))
+ *     .add(Row.of(ActionButton.primary("edit", "Edit")))
  *     .accentColor(0x5865F2)
- *     .build();
+ *     .build(ctx);
  *
  * event.replyComponents(container).useComponentsV2().queue();
  * }</pre>
  */
 public class MenuBuilder {
     private final String menuId;
-    private final List<Component> children = new ArrayList<>();
+    private final List<MenuComponent> children = new ArrayList<>();
     private Integer accentColor;
     private boolean spoiler;
 
@@ -39,20 +39,20 @@ public class MenuBuilder {
     }
 
     /** Add a component child. */
-    public MenuBuilder add(Component component) {
+    public MenuBuilder add(MenuComponent component) {
         children.add(component);
         return this;
     }
 
     /** Add varargs component children. */
     @SafeVarargs
-    public final MenuBuilder add(Component... components) {
+    public final MenuBuilder add(MenuComponent... components) {
         children.addAll(Arrays.asList(components));
         return this;
     }
 
     /** Add all components from a collection. */
-    public MenuBuilder addAll(Collection<? extends Component> components) {
+    public MenuBuilder addAll(Collection<? extends MenuComponent> components) {
         children.addAll(components);
         return this;
     }
@@ -70,7 +70,7 @@ public class MenuBuilder {
     }
 
     /** Render and validate into a JDA Container. */
-    public Container build(Context ctx) {
+    public Container build(MenuContext ctx) {
         var rendered = new ArrayList<ContainerChildComponent>();
         for (var child : children) {
             rendered.addAll(child.render(ctx));

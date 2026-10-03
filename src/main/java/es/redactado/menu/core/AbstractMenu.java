@@ -1,7 +1,7 @@
 package es.redactado.menu.core;
 
-import es.redactado.menu.api.Context;
 import es.redactado.menu.api.Menu;
+import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.view.Validator;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
@@ -26,26 +26,26 @@ public abstract class AbstractMenu implements Menu {
     }
 
     @Override
-    public Container render(Context ctx) {
+    public Container render(MenuContext ctx) {
         return build(ctx);
     }
 
-    protected abstract Container build(Context ctx);
+    protected abstract Container build(MenuContext ctx);
 
     @Override
-    public void onButton(Context ctx, ButtonInteractionEvent event) {
+    public void onButton(MenuContext ctx, ButtonInteractionEvent event) {
         if ("nav".equals(ctx.action())) handleBack(ctx, event);
     }
 
     @Override
-    public void onModal(Context ctx, ModalInteractionEvent event) {}
+    public void onModal(MenuContext ctx, ModalInteractionEvent event) {}
 
-    protected Container renderValidated(Context ctx) {
+    protected Container renderValidated(MenuContext ctx) {
         return Validator.verify(render(ctx));
     }
 
     /** Re-render and edit message. For ButtonInteraction: direct edit; for Modal: deferEdit + hook. */
-    protected void refresh(Context ctx) {
+    protected void refresh(MenuContext ctx) {
         var container = render(ctx);
         var event = ctx.event();
         if (event instanceof ButtonInteractionEvent be) {
@@ -61,11 +61,11 @@ public abstract class AbstractMenu implements Menu {
     }
 
     /** Reply with a modal. */
-    protected void showModal(Context ctx, Modal modal) {
+    protected void showModal(MenuContext ctx, Modal modal) {
         if (ctx.event() instanceof IModalCallback mc) mc.replyModal(modal).queue();
     }
 
-    protected void handleBack(Context ctx, ButtonInteractionEvent event) {
+    protected void handleBack(MenuContext ctx, ButtonInteractionEvent event) {
         ctx.pop()
                 .ifPresentOrElse(
                         prev -> {

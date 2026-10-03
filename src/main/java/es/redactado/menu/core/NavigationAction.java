@@ -1,6 +1,6 @@
 package es.redactado.menu.core;
 
-import es.redactado.menu.api.Context;
+import es.redactado.menu.api.MenuContext;
 
 /**
  * Describes a navigation action triggered by a button click.
@@ -9,7 +9,7 @@ import es.redactado.menu.api.Context;
 public record NavigationAction(NavigationMode mode, String targetMenuId) {
 
     /** Parse from a Context whose action is "nav". */
-    public static NavigationAction fromContext(Context ctx) {
+    public static NavigationAction fromContext(MenuContext ctx) {
         var mode = NavigationMode.valueOf(ctx.param(0).orElse("PUSH").toUpperCase());
         var target =
                 ctx.param(1).orElseThrow(() -> new IllegalArgumentException("Missing target menu"));

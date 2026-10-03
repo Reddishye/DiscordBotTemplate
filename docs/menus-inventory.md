@@ -134,6 +134,12 @@ src/main/resources/
   logback.xml
 src/test/java/es/redactado/
   TestStackTest.java
+src/test/java/es/redactado/menu/view/
+  MenuBuilderTest.java
+src/main/java/es/redactado/menu/
+  api/                            Menu, MenuContext, MenuComponent, exceptions
+  core/                           MenuRouter, ComponentId, navigation, base classes
+  view/                           MenuBuilder, components, Limits, Validator
 ```
 
 ### 1.8 Test infrastructure
@@ -259,38 +265,41 @@ not for version compatibility.
 `repomix-output.xml` in the source menu directory is a generated dump, not code,
 and is not ported.
 
-### 3.1 Classes to port
+### 3.1 Classes ported
 
-| Source | Lines | Target package | Notes |
+All 28 SOURCE classes except `ProfileMenu` were ported in T1. The "Target" column
+is the final path; the "Name" column is the final type name where it differs.
+
+| SOURCE | Target | Name | Later work |
 | --- | --- | --- | --- |
-| `api/Menu.java` | 24 | `es.redactado.menu.api` | becomes `Menu`, gains an action table in T3 |
-| `api/Component.java` | 17 | `es.redactado.menu.api` | renamed `MenuComponent` |
-| `api/Context.java` | 85 | `es.redactado.menu.api` | renamed `MenuContext`; state and back-stack removed in T5 |
-| `api/Renderable.java` | 11 | not ported | redundant with `Component`, which already returns a list |
-| `api/NavigationAware.java` | 15 | not ported as-is | becomes the `onEnter`/`onLeave` hook required by section 5.4 |
-| `base/AbstractMenu.java` | 80 | `es.redactado.menu.core` | replaced by the T4 dispatcher; only the modal-opening helper survives |
-| `base/BaseContext.java` | 197 | `es.redactado.menu.core` | becomes the `MenuContext` record |
-| `builder/MenuBuilder.java` | 93 | `es.redactado.menu.view` | moved to the view layer and made preset-aware in T10 |
-| `component/Text.java` | 36 | `es.redactado.menu.view` | as-is |
-| `component/Field.java` | 65 | `es.redactado.menu.view` | hardcoded Spanish fallback and custom emoji ids removed |
-| `component/ActionRow.java` | 41 | `es.redactado.menu.view` | renamed `Row` |
-| `component/ActionButton.java` | 74 | `es.redactado.menu.view` | emoji now comes from the preset |
-| `component/LinkButton.java` | 37 | `es.redactado.menu.view` | as-is |
-| `component/Gallery.java` | 32 | `es.redactado.menu.view` | as-is |
-| `component/SectionList.java` | 93 | `es.redactado.menu.view` | superseded by `Pager<T>` from section 5.3 |
-| `component/JdaSeparator.java` | 26 | `es.redactado.menu.view` | absorbed into `Divider` |
-| `component/ThumbnailComponent.java` | 25 | `es.redactado.menu.view` | absorbed into `Section` accessory |
-| `dispatch/ComponentId.java` | 71 | `es.redactado.menu.core` | rewritten in T2 without `split` |
-| `dispatch/MenuRouter.java` | 102 | `es.redactado.menu.core` | rewritten in T4 as the O(1) dispatcher |
-| `exception/MenuException.java` | 11 | `es.redactado.menu.api` | renamed `MenuException`, kept as the base type |
-| `exception/ComponentLimitException.java` | 20 | `es.redactado.menu.view` | kept, raised by `Limits` |
-| `exception/MenuNotFoundException.java` | 14 | `es.redactado.menu.api` | kept |
-| `exception/StateNotFoundException.java` | 14 | not ported | replaced by `UserFacingException` from 5.5 |
-| `navigation/NavigationAction.java` | 24 | `es.redactado.menu.core` | absorbed into the navigation API of T5 |
-| `navigation/NavigationMode.java` | 13 | `es.redactado.menu.core` | reduced to the push/pop/replace/root modes of section 5.4 |
-| `validation/Limits.java` | 24 | `es.redactado.menu.view` | extended with the JDA 6.4.2 limits |
-| `validation/ValidationResult.java` | 72 | `es.redactado.menu.view` | kept, rewritten as an immutable record |
-| `validation/Validator.java` | 54 | `es.redactado.menu.view` | kept, extended for tests-versus-production behaviour |
+| `api/Component.java` | `api/MenuComponent.java` | `MenuComponent` | render contract fixed in T10 |
+| `api/Context.java` | `api/MenuContext.java` | `MenuContext` | state and back-stack moved to sessions in T5 |
+| `api/Menu.java` | `api/Menu.java` | `Menu` | gains an action table in T3 |
+| `api/NavigationAware.java` | `api/NavigationAware.java` | `NavigationAware` | becomes the `onEnter`/`onLeave` hook in T5, or is removed |
+| `api/Renderable.java` | `api/Renderable.java` | `Renderable` | unused, removed in T14 |
+| `base/AbstractMenu.java` | `core/AbstractMenu.java` | `AbstractMenu` | replaced by the dispatcher in T4 |
+| `base/BaseContext.java` | `core/BaseContext.java` | `BaseContext` | becomes the `MenuContext` implementation in T5 |
+| `builder/MenuBuilder.java` | `view/MenuBuilder.java` | `MenuBuilder` | made preset-aware in T10 |
+| `component/ActionButton.java` | `view/ActionButton.java` | `ActionButton` | broken cast, fixed in T10 |
+| `component/ActionRow.java` | `view/Row.java` | `Row` | renamed to avoid the JDA clash |
+| `component/Field.java` | `view/Field.java` | `Field` | emoji from preset in T10 |
+| `component/Gallery.java` | `view/Gallery.java` | `Gallery` | as-is |
+| `component/JdaSeparator.java` | `view/JdaSeparator.java` | `JdaSeparator` | folded into `Divider` in T10 |
+| `component/LinkButton.java` | `view/LinkButton.java` | `LinkButton` | broken cast, fixed in T10 |
+| `component/SectionList.java` | `view/SectionList.java` | `SectionList` | superseded by `Pager<T>` in T10 |
+| `component/Text.java` | `view/Text.java` | `Text` | as-is |
+| `component/ThumbnailComponent.java` | `view/ThumbnailComponent.java` | `ThumbnailComponent` | broken cast, folded into `Section` in T10 |
+| `dispatch/ComponentId.java` | `core/ComponentId.java` | `ComponentId` | rewritten without `split` in T2 |
+| `dispatch/MenuRouter.java` | `core/MenuRouter.java` | `MenuRouter` | rewritten as the O(1) dispatcher in T4 |
+| `exception/ComponentLimitException.java` | `api/ComponentLimitException.java` | `ComponentLimitException` | kept |
+| `exception/MenuException.java` | `api/MenuException.java` | `MenuException` | kept as the base type |
+| `exception/MenuNotFoundException.java` | `api/MenuNotFoundException.java` | `MenuNotFoundException` | kept |
+| `exception/StateNotFoundException.java` | `api/StateNotFoundException.java` | `StateNotFoundException` | replaced by `UserFacingException` in T5 |
+| `navigation/NavigationAction.java` | `core/NavigationAction.java` | `NavigationAction` | absorbed into the T5 navigation API |
+| `navigation/NavigationMode.java` | `core/NavigationMode.java` | `NavigationMode` | reduced to push/pop/replace/root in T5 |
+| `validation/Limits.java` | `view/Limits.java` | `Limits` | extended with the 6.4.2 limits in T10 |
+| `validation/ValidationResult.java` | `view/ValidationResult.java` | `ValidationResult` | rewritten as a record in T10 |
+| `validation/Validator.java` | `view/Validator.java` | `Validator` | strict in tests, lenient in production, in T10 |
 
 ### 3.2 Not ported
 
@@ -338,6 +347,12 @@ Carried over from the source, and each one contradicts a rule of the plan:
   in production.
 - `ProfileMenu` reaches into `es.redactado.database.type.LinkType`, a
   bot-specific type that must not be copied into the template.
+- `ActionButton#render`, `LinkButton#render`, and `ThumbnailComponent#render`
+  cast a JDA `Button` or `Thumbnail` to `ContainerChildComponent`. Those JDA
+  types extend `ActionRowChildComponent` and `SectionAccessoryComponent`, and
+  the hierarchies are disjoint, so every call throws `ClassCastException`. The
+  source bot never hit this because `ProfileMenu` builds JDA components directly
+  and never instantiates these three classes. Detailed in `NOTES.md`.
 
 ### 3.4 Source constants reused verbatim
 

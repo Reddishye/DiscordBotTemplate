@@ -176,24 +176,153 @@ Mapping chosen:
 `api` must hold public contracts per section 4, and section 5.5 puts
 `UserFacingException` there explicitly.
 
-## Source items deliberately not ported
+## Source items ported but expected to be replaced later
 
-- `api/Renderable.java`. `Component#render` already returns a list, so
-  `Renderable` is a redundant single-method interface. Section 2.2 forbids
-  over-abstracted single-implementation interfaces.
-- `component/SectionList.java`. Section 5.3 specifies `Pager<T>` with the page
-  held in the session. `SectionList` keeps its page in per-event state and emits
-  an unhandled `noop` custom id, so porting it would reintroduce a known bug.
-- `component/JdaSeparator.java` and `component/ThumbnailComponent.java`. Folded
-  into `Divider` and the `Section` accessory required by section 5.3.
-- `api/NavigationAware.java` in its current shape. Section 5.4 asks for
-  `onEnter`/`onLeave` hooks that the router actually invokes; the source
-  interface is never called anywhere in the source bot, so porting it verbatim
-  would create a dead interface.
-- `exception/StateNotFoundException.java`. Section 5.5 replaces it with
-  `UserFacingException` carrying a localized message.
-- `ProfileMenu.java` as production code. Ported only as
-  `examples/ProfileExampleMenu` on an in-memory fake service, per section 1.
+An earlier revision of this file listed these as "not ported". The maintainer
+overruled that for T1: **every SOURCE class except `ProfileMenu` is ported first**,
+and removals happen in later tasks where the surrounding design is being rewritten.
+All 28 files are in the tree as of commit `rename types that clash with jda`.
+
+| Class | Why ported anyway | Due |
+| --- | --- | --- |
+| `api/Renderable` | redundant next to `MenuComponent#render`, but harmless and unused | T14 cleanup |
+| `api/NavigationAware` | never invoked by the source router, so it is a dead interface | T5, must become the `onEnter`/`onLeave` hook or be removed |
+| `api/StateNotFoundException` | used by `MenuContext#require` | T5, replaced by `UserFacingException` |
+| `view/SectionList` | keeps its page in per-event state and emits an unhandled `"noop"` custom id | T10, replaced by `Pager<T>` |
+| `view/JdaSeparator` | static factory returning a raw JDA component, not a `MenuComponent` | T10, folded into `Divider` |
+| `view/ThumbnailComponent` | guaranteed `ClassCastException`, see above | T10 |
+| `core/AbstractMenu` | carries the `onButton` string comparison and the modal helper | T4, replaced by the dispatcher |
+
+`ProfileMenu.java` is still excluded from production code, per section 1. It is
+ported only later as `examples/ProfileExampleMenu` on an in-memory fake service.
+
+## Rename verification (T1 commit 2)
+
+Renamed with IDE refactoring, which updated declarations, all references, and
+Javadoc: `Component` to `MenuComponent`, `Context` to `MenuContext`, `ActionRow`
+to `Row`.
+
+Clash check: extracted the simple name of every type declared in
+`src/main/java/es/redactado/menu/{api,core,view}` and intersected it with all
+1121 simple names of `*.java` under `net/dv8tion` in `JDA-6.4.2-sources.jar`.
+
+**Result: zero collisions.**
+
+```
+AbstractMenu ActionButton BaseContext ComponentId ComponentLimitException Field
+Gallery JdaSeparator Limits LinkButton Menu MenuBuilder MenuComponent MenuContext
+MenuException MenuNotFoundException MenuRouter NavigationAction NavigationAware
+NavigationMode Renderable Row SectionList StateNotFoundException Text
+ThumbnailComponent ValidationResult Validator
+```
+
+Honest detail on why each rename was needed:
+
+| Old name | Exists in JDA 6.4.2 | Reason |
+| --- | --- | --- |
+| `Component` | yes, `net.dv8tion.jda.api.components.Component` | real collision, avoided |
+| `ActionRow` | yes, `net.dv8tion.jda.api.components.actionrow.ActionRow` | real collision, avoided |
+| `Context` | no | precautionary; no JDA type of that simple name exists |
+
+`Context` was renamed because it was specified, not because JDA forces it. The
+name is clearer next to its siblings, so the rename was kept, but it was not
+required.
+
+One stale reference was fixed as part of the rename: the `MenuBuilder` Javadoc
+sample still called `MenuBuilder.create("profile", ctx)` and `ActionRow.of(...)`,
+neither of which existed. It now matches the real signature and uses `Row`.
+
+## Back behaviour
+
+Confirmed by the maintainer and implemented in **T5**, not T1:
+
+- On a **root** menu, `Back` renders the declared root view **silently**. No
+  message, no error.
+- When a **session has expired** and the menu is **not** a root, the router shows
+  the localized `menu.error.expired` notice and then renders the root view.
+
+The T1 port still contains the old behaviour: `AbstractMenu#handleBack` replies
+`"No previous menu."` ephemerally when the per-event back stack is empty. That is
+the defect T5 removes.
+
+## Defects found during the port
+
+### `ActionButton`, `LinkButton`, and `ThumbnailComponent` always throw
+
+Discovered by the T1 smoke test, not present in the known-defects list.
+
+`MenuComponent#render` is declared as returning
+`List<ContainerChildComponent>`, but JDA's component hierarchies are disjoint:
+
+```
+Button     extends ActionComponent, ActionRowChildComponent, SectionAccessoryComponent
+Thumbnail  extends SectionAccessoryComponent
+ContainerChildComponent extends Component
+ActionRowChildComponent  extends Component
+SectionAccessoryComponent extends Component
+```
+
+`Button` and `Thumbnail` are **not** `ContainerChildComponent`. All three
+classes therefore end their render with a cast that can never succeed:
+
+- `ActionButton#render` returns `List.of((ContainerChildComponent) btn)`
+- `LinkButton#render` returns `List.of((ContainerChildComponent) btn)`
+- `ThumbnailComponent#render` returns `List.of((ContainerChildComponent) Thumbnail.fromUrl(url))`
+
+Verified at runtime on JDA 6.4.2:
+
+```
+java.lang.ClassCastException: class net.dv8tion.jda.internal.components.buttons.ButtonImpl
+  cannot be cast to class net.dv8tion.jda.api.components.container.ContainerChildComponent
+  at es.redactado.menu.view.ActionButton.render(ActionButton.java:71)
+
+java.lang.ClassCastException: class net.dv8tion.jda.internal.components.thumbnail.ThumbnailImpl
+  cannot be cast to class net.dv8tion.jda.api.components.container.ContainerChildComponent
+  at es.redactado.menu.view.ThumbnailComponent.render(ThumbnailComponent.java:23)
+```
+
+**Why SOURCE never noticed.** `ProfileMenu` builds JDA buttons, rows, and
+sections directly and only ever imports `Text`, `Field`, `Gallery`, and
+`JdaSeparator`. `ActionButton`, `LinkButton`, and `ThumbnailComponent` are
+unreachable dead code in the source bot.
+
+**Decision.** Ported verbatim and left broken, because fixing it requires
+changing the `MenuComponent#render` signature, which T1 explicitly forbids
+("do not change behaviour, signatures, or logic"). The three classes are marked
+as broken in `MenuBuilderTest`'s Javadoc so nobody discovers it at runtime.
+
+**Mandatory fix, due in T10** when the view layer is rewritten to be
+preset-aware. The contract has to change from
+`List<ContainerChildComponent>` to something that can carry both container
+children and row or accessory children, for example
+`List<? extends Component>`, with `MenuBuilder` narrowing to
+`ContainerChildComponent` and `Row` narrowing to `ActionRowChildComponent`.
+`Row#render` already casts its children to `ActionRowChildComponent`, so it is
+already written for that contract.
+
+**Question.** Should the three broken classes be deleted in T10 instead of
+fixed, given that `Row` with plain JDA buttons covers the same ground?
+
+**Default.** Fix them, because section 5.3 lists `ActionButton`, `LinkButton`,
+and `Section` as required components.
+
+### Hardcoded emoji that must move into presets
+
+Left in place by T1 because removing them changes rendered output:
+
+- `SectionList` renders pagination buttons with `Emoji.fromUnicode("◀")` and
+  `Emoji.fromUnicode("▶")`.
+- `Field` uses the custom emoji `lucide_check` (`1521846140775960626L`) as its
+  default accessory and `lucide_eraser` (`1521822427246759936L`) for the danger
+  variant, hardcoded in the class.
+
+Both violate section 5.1, which requires every emoji to come from the active
+preset. Section 5.1 already names `back`, `next`, and `previous` as preset slots,
+so T10 must replace these literals.
+
+`Field`'s custom emoji ids are additionally hardcoded to one specific Discord
+server's emoji, which is wrong for a template. T10 should use generic unicode
+emoji from the preset instead.
 
 ## Open questions
 

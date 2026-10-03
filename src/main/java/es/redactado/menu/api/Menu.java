@@ -23,7 +23,7 @@ public interface Menu {
      * @param ctx the context of the current interaction
      * @return the rendered container
      */
-    Container render(Context ctx);
+    Container render(MenuContext ctx);
 
     /**
      * Handles a button click belonging to this menu.
@@ -31,7 +31,7 @@ public interface Menu {
      * @param ctx the context of the current interaction
      * @param event the JDA button event
      */
-    default void onButton(Context ctx, ButtonInteractionEvent event) {}
+    default void onButton(MenuContext ctx, ButtonInteractionEvent event) {}
 
     /**
      * Handles a modal submission belonging to this menu.
@@ -39,5 +39,5 @@ public interface Menu {
      * @param ctx the context of the current interaction
      * @param event the JDA modal event
      */
-    default void onModal(Context ctx, ModalInteractionEvent event) {}
+    default void onModal(MenuContext ctx, ModalInteractionEvent event) {}
 }

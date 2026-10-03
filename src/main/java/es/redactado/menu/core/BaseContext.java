@@ -1,6 +1,6 @@
 package es.redactado.menu.core;
 
-import es.redactado.menu.api.Context;
+import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.StateNotFoundException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,7 +13,7 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 
-public class BaseContext implements Context {
+public class BaseContext implements MenuContext {
 
     private final String menuId;
     private final String action;
@@ -25,7 +25,7 @@ public class BaseContext implements Context {
     private final Optional<ThreadChannel> thread;
     private final IReplyCallback event;
     private final Map<String, Object> state = new ConcurrentHashMap<>();
-    private final Deque<Context> backStack = new ArrayDeque<>();
+    private final Deque<MenuContext> backStack = new ArrayDeque<>();
 
     private BaseContext(
             String menuId,
@@ -48,7 +48,7 @@ public class BaseContext implements Context {
         this.event = event;
     }
 
-    public static Context fromButton(ButtonInteractionEvent e, ComponentId parsed) {
+    public static MenuContext fromButton(ButtonInteractionEvent e, ComponentId parsed) {
         return new BaseContext(
                 parsed.menuId(),
                 parsed.action(),
@@ -61,7 +61,7 @@ public class BaseContext implements Context {
                 e);
     }
 
-    public static Context fromModal(ModalInteractionEvent e, ComponentId parsed) {
+    public static MenuContext fromModal(ModalInteractionEvent e, ComponentId parsed) {
         return new BaseContext(
                 parsed.menuId(),
                 parsed.action(),
@@ -180,12 +180,12 @@ public class BaseContext implements Context {
     }
 
     @Override
-    public void push(Context previous) {
+    public void push(MenuContext previous) {
         backStack.push(previous);
     }
 
     @Override
-    public Optional<Context> pop() {
+    public Optional<MenuContext> pop() {
         return Optional.ofNullable(backStack.poll());
     }
 
