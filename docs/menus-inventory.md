@@ -15,7 +15,7 @@ exact JDA version this template depends on.
 | Base package | `es.redactado` |
 | Group / version | `es.redactado` / `1.0-SNAPSHOT` |
 | Source roots | `src/main/java`, `src/main/resources` |
-| Test roots | none configured yet |
+| Test roots | `src/test/java` |
 
 The menu framework therefore lives under `es.redactado.menu`.
 
@@ -24,19 +24,18 @@ The menu framework therefore lives under `es.redactado.menu`.
 | Item | Value |
 | --- | --- |
 | Build tool | Gradle 9.0.0 (Kotlin DSL, `build.gradle.kts`) |
-| Java version | not pinned by a `java { toolchain }` block, so it follows the Gradle JVM: JDK 24.0.2 |
+| Java version | pinned to 21 by `java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }` |
 | Formatter | Spotless 7.2.1, google-java-format 1.26.0, AOSP style, `reflowLongStrings`, `skipJavadocFormatting`, `formatAnnotations`, `removeUnusedImports` |
 | Packaging | Shadow 9.2.2 (`shadowJar`), Sentry 5.12.1, `application` plugin with main class `es.redactado.Main` |
 
-A formatter is already configured, so Spotless stays as-is. Because the Java
-version is 24, records, sealed hierarchies, pattern-matching `switch`, and
-virtual threads are all available.
+A formatter is already configured, so Spotless stays as-is. Java 21 supplies
+records, sealed hierarchies, pattern-matching `switch`, and virtual threads.
 
 ### 1.3 Dependencies
 
 Present in `build.gradle.kts`:
 
-- JDA `6.0.0-rc.3` (`opus-java` excluded)
+- JDA `6.4.2` (`opus-java` excluded)
 - discord-webhooks `0.8.4`
 - Guice `7.0.0`
 - dotenv-java `3.2.0`
@@ -45,25 +44,30 @@ Present in `build.gradle.kts`:
 - Hibernate ORM `7.1.5.Final` (core, hikaricp, jcache, community-dialects)
 - jakarta.transaction-api
 - HikariCP `7.0.2`, MariaDB `3.5.7`, SQLite `3.50.3.0`, H2 `2.3.232`
+- jackson-databind `2.19.1`
+
+Test-only: JUnit Jupiter `5.11.4`, Mockito `5.14.2`, AssertJ `3.26.3`,
+`junit-platform-launcher`, and `net.bytebuddy:byte-buddy-agent:1.17.6` in a
+dedicated `mockitoAgent` configuration used as a `-javaagent`.
 
 Findings that affect the port:
 
-- **Caffeine is required but undeclared.** The working tree removed
-  `com.github.benmanes.caffeine:caffeine:v3.2.2` and `caffeine:jcache:v3.2.2`
+- **Caffeine was undeclared in the working tree.** The working tree removed
+  `com.github.ben-manes.caffeine:caffeine:v3.2.2` and `caffeine:jcache:v3.2.2`
   from `build.gradle.kts`, yet `src/main/java/es/redactado/command/handler/CommandRegister.java`
   still imports `com.github.benmanes.caffeine.cache.Cache` and
   `com.github.benmanes.caffeine.cache.Caffeine`. `./gradlew compileJava`
-  therefore fails with 8 errors before any menu work begins. Both dependency
-  lines exist in `HEAD`, so restoring them is the conservative fix and it also
-  satisfies section 2.3 of the plan.
-- **No test framework.** There is no `src/test` tree, no JUnit/Mockito/AssertJ
-  dependency, and no `test { useJUnitPlatform() }` block. The task plan adds
-  JUnit 5, Mockito, and AssertJ.
-- **Serialization.** Jackson Databind `2.19.1` is already resolved in
-  `runtimeClasspath` through JDA's own dependency, but it is *not* on
-  `compileClasspath`, so menu code cannot compile against it as-is. The plan
-  declares it explicitly at the already-resolved version rather than introducing
-  a new library.
+  therefore failed with 8 errors before any menu work began. Both lines were
+  already in `HEAD`, so the file was restored to its committed content. The menu
+  runtime also needs Caffeine for sessions, cooldown, and async loading, which
+  section 2.3 permits.
+- **Test infrastructure was added.** There was no `src/test` tree, no test
+  dependency, and no `useJUnitPlatform()`. See section 1.8.
+- **Serialization.** Jackson Databind `2.19.1` is resolved in `runtimeClasspath`
+  through JDA's own dependency, but it is *not* on `compileClasspath`, so menu
+  code cannot compile against it without a declaration. It is declared explicitly
+  at the already-resolved version rather than introducing a new library. Preset
+  files are JSON only; no YAML module is added.
 
 ### 1.4 Dependency injection
 
@@ -128,11 +132,29 @@ src/main/java/es/redactado/
 src/main/resources/
   .env.example
   logback.xml
+src/test/java/es/redactado/
+  TestStackTest.java
 ```
 
-## 2. JDA 6.0.0-rc.3 API surface
+### 1.8 Test infrastructure
 
-Checked in `JDA-6.0.0-rc.3-sources.jar`.
+`tasks.test` uses `useJUnitPlatform()`. Two JVM settings are required, both
+explained in `NOTES.md`:
+
+- `testRuntimeOnly("org.junit.platform:junit-platform-launcher")`, because
+  Gradle's test executor loads the launcher reflectively and its absence fails
+  the task with `Failed to load JUnit Platform`.
+- `-javaagent:${mockitoAgent.asPath}` pointing at `byte-buddy-agent`, because
+  Mockito's inline mock maker otherwise self-attaches and prints
+  `Mockito is currently self-attaching` on every test JVM start on Java 21.
+
+`src/test/java/es/redactado/TestStackTest.java` proves the stack: four tests
+covering interface mocking, interaction verification, virtual threads, and the
+pinned toolchain version.
+
+## 2. JDA 6.4.2 API surface
+
+Checked in `JDA-6.4.2-sources.jar`.
 
 ### 2.1 Available
 
@@ -150,6 +172,7 @@ Components V2 is fully present:
 | `ActionRow` | `net.dv8tion.jda.api.components.actionrow.ActionRow` |
 | `StringSelectMenu` | `net.dv8tion.jda.api.components.selections.StringSelectMenu` |
 | `TextInput` | `net.dv8tion.jda.api.components.textinput.TextInput` |
+| `Label` | `net.dv8tion.jda.api.components.label.Label` |
 | `Modal` | `net.dv8tion.jda.api.modals.Modal` |
 
 `MessageRequest#useComponentsV2()` and `MessageRequest#setComponents(Collection)`
@@ -161,14 +184,23 @@ this version. `MessageCreateRequest` likewise extends `MessageRequest`.
 There are no `Components.container(...)` convenience factories in this version;
 the entry point is `Container.of(...)`.
 
-### 2.2 Missing
+### 2.2 Modal building
 
-`net.dv8tion.jda.api.components.label.Label` does not exist in 6.0.0-rc.3. The
-source `ProfileMenu` builds modals with `Label.of(String, TextInput)`. On this
-JDA version a modal is built with `Modal.Builder#addActionRow(TextInput)` and the
-label is supplied through `TextInput.create(id, label, style)`, where
-`TextInput.MAX_LABEL_LENGTH` is 45. The `ModalForm` component must use
-`addActionRow`.
+`Label` exists, so modals are built exactly as the source does, with
+`Modal.Builder#addComponents(Label.of(String label, TextInput input))`.
+
+Two facts that matter for `ModalForm`:
+
+- `TextInput.create` takes `(String id, TextInputStyle style)`. There is **no**
+  label parameter and **no** `TextInput.MAX_LABEL_LENGTH`. The 45-character limit
+  moved to `Label.LABEL_MAX_LENGTH`.
+- `Modal.Builder` has **no** `addActionRow`. Its only mutators are `setId`,
+  `setTitle`, and three `addComponents` overloads. Every modal input must be
+  wrapped in a `Label`.
+
+For reference, in JDA 6.0.0-rc.3 `Modal.Builder#addActionRow` already carried
+`@Deprecated` and `@ForRemoval`, so the fallback path described in the task plan
+would have used a deprecated method even on that version.
 
 ### 2.3 Limits read from the JDA version
 
@@ -186,9 +218,10 @@ label is supplied through `TextInput.create(id, label, style)`, where
 | `SelectOption.VALUE_MAX_LENGTH` | 100 |
 | `SelectOption.DESCRIPTION_MAX_LENGTH` | 100 |
 | `TextInput.MAX_ID_LENGTH` | 100 |
-| `TextInput.MAX_LABEL_LENGTH` | 45 |
 | `TextInput.MAX_VALUE_LENGTH` | 4000 |
 | `TextInput.MAX_PLACEHOLDER_LENGTH` | 100 |
+| `Label.LABEL_MAX_LENGTH` | 45 |
+| `Label.DESCRIPTION_MAX_LENGTH` | 100 |
 | `Modal.MAX_COMPONENTS` | 5 |
 | `Modal.MAX_ID_LENGTH` | 100 |
 | `Modal.MAX_TITLE_LENGTH` | 45 |
@@ -196,16 +229,19 @@ label is supplied through `TextInput.create(id, label, style)`, where
 
 ### 2.4 Interaction APIs used by the dispatcher
 
-| Need | Available signature |
+| Need | Verified signature |
 | --- | --- |
 | Fast acknowledgement | `GenericComponentInteractionCreateEvent#deferEdit()` returning `MessageEditCallbackAction` |
 | Modal response | `GenericComponentInteractionCreateEvent#replyModal(Modal)` returning `ModalCallbackAction` |
 | Hook access | `GenericComponentInteractionCreateEvent#getHook()` |
-| Edit the original message | `InteractionHook#editOriginalComponents(Collection<? extends MessageTopLevelComponent>)` returning `WebhookMessageEditAction<T>` |
+| Edit the original message | `InteractionHook#editOriginalComponents(Collection<? extends MessageTopLevelComponent>)` returning `WebhookMessageEditAction<Message>` |
 | Send an ephemeral follow-up | `InteractionHook#sendMessage(String)` |
-| Button payload | `GenericComponentInteractionCreateEvent#getComponentId()`, `getMessageIdLong()`, `getMessage()`, `getChannel()`, `getUser()`, `getGuild()`, `getMember()` |
+| Button payload | `getComponentId()`, `getMessageIdLong()`, `getMessage()`, `getChannel()`, `getUser()`, `getGuild()`, `getMember()` |
 | Select payload | `StringSelectInteraction#getValues()`, `getSelectedOptions()` |
+| Modal payload | `ModalInteractionEvent#getModalId()`, `getValues()`, `ModalMapping#getCustomId()`, `getAsString()` |
 | Locale | `Interaction#getUserLocale()` returning `DiscordLocale`, `Interaction#getGuildLocale()` |
+| Emoji | `Emoji#fromUnicode(String)`, `Emoji#fromCustom(String, long, boolean)` |
+| Buttons | `Button#primary/secondary/success/danger/link/of`, `#asDisabled()`, `#withEmoji(Emoji)` |
 
 `DiscordLocale#getLanguageTag()` and `getLocale()` are available, so locale
 selection can follow interaction locale, then guild locale, then English.
@@ -214,8 +250,11 @@ selection can follow interaction locale, then guild locale, then English.
 
 Root: `/home/redactado/Workspace/scpsl-helperbot/src/main/java/es/redactado/menu`
 (29 files, 1737 lines of Java, including `ProfileMenu`).
-The source project itself uses JDA 6.4.2, which is why `Label` appears there and
-not in the target's JDA version.
+
+The source project uses JDA 6.4.2, which is now also the target's version, so
+every Components V2 pattern the source relies on ports over unchanged. The only
+API edits the port needs are the ones made for the menu framework's own rules,
+not for version compatibility.
 
 `repomix-output.xml` in the source menu directory is a generated dump, not code,
 and is not ported.
@@ -249,7 +288,7 @@ and is not ported.
 | `exception/StateNotFoundException.java` | 14 | not ported | replaced by `UserFacingException` from 5.5 |
 | `navigation/NavigationAction.java` | 24 | `es.redactado.menu.core` | absorbed into the navigation API of T5 |
 | `navigation/NavigationMode.java` | 13 | `es.redactado.menu.core` | reduced to the push/pop/replace/root modes of section 5.4 |
-| `validation/Limits.java` | 24 | `es.redactado.menu.view` | extended with the JDA 6.0.0-rc.3 limits |
+| `validation/Limits.java` | 24 | `es.redactado.menu.view` | extended with the JDA 6.4.2 limits |
 | `validation/ValidationResult.java` | 72 | `es.redactado.menu.view` | kept, rewritten as an immutable record |
 | `validation/Validator.java` | 54 | `es.redactado.menu.view` | kept, extended for tests-versus-production behaviour |
 
