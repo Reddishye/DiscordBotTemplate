@@ -19,6 +19,7 @@ import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.interactions.DiscordLocale;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
@@ -116,6 +117,27 @@ public final class BaseContext implements MenuContext {
      */
     public static MenuContext fromModal(
             ModalInteractionEvent event,
+            ComponentId parsed,
+            SessionStore sessions,
+            Navigator navigator,
+            Messages messages,
+            Preset preset) {
+        return from(event, parsed, sessions, navigator, messages, preset);
+    }
+
+    /**
+     * Builds a context from a string select submission.
+     *
+     * @param event the JDA select event
+     * @param parsed the decoded component id
+     * @param sessions the store backing this context's session
+     * @param navigator the navigator used by {@link #navigate}
+     * @param messages where user-facing text is resolved
+     * @param preset the preset resolved for this interaction
+     * @return the context
+     */
+    public static MenuContext fromSelect(
+            StringSelectInteractionEvent event,
             ComponentId parsed,
             SessionStore sessions,
             Navigator navigator,

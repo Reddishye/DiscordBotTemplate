@@ -16,10 +16,15 @@ public final class ActionTable {
 
     private final Map<String, ButtonAction> buttons;
     private final Map<String, ModalAction> modals;
+    private final Map<String, SelectAction> selects;
 
-    private ActionTable(Map<String, ButtonAction> buttons, Map<String, ModalAction> modals) {
+    private ActionTable(
+            Map<String, ButtonAction> buttons,
+            Map<String, ModalAction> modals,
+            Map<String, SelectAction> selects) {
         this.buttons = Map.copyOf(buttons);
         this.modals = Map.copyOf(modals);
+        this.selects = Map.copyOf(selects);
     }
 
     /**
@@ -52,6 +57,20 @@ public final class ActionTable {
     }
 
     /**
+     * The select action declared under a name.
+     *
+     * <p>Namespaces are separate: {@code "save"} can be a button and a select at once,
+     * because they arrive through different component types and never collide in a
+     * custom id.
+     *
+     * @param name the action name
+     * @return the action, or empty when none is declared
+     */
+    public Optional<SelectAction> select(String name) {
+        return Optional.ofNullable(selects.get(name));
+    }
+
+    /**
      * Number of declared button actions.
      *
      * @return the button action count
@@ -69,11 +88,21 @@ public final class ActionTable {
         return modals.size();
     }
 
+    /**
+     * How many select actions are declared.
+     *
+     * @return the count
+     */
+    public int selectCount() {
+        return selects.size();
+    }
+
     /** Collects actions and rejects ill-formed or duplicated ones eagerly. */
     public static final class Builder {
 
         private final Map<String, ButtonAction> buttons = new HashMap<>();
         private final Map<String, ModalAction> modals = new HashMap<>();
+        private final Map<String, SelectAction> selects = new HashMap<>();
 
         /**
          * Declares a button action.
@@ -124,6 +153,30 @@ public final class ActionTable {
             return this;
         }
 
+        /**
+         * Declares a string select action.
+         *
+         * <p>{@link Ack#MODAL} is allowed here, unlike for a modal action: a select can
+         * open a follow-up modal, which is a normal flow such as choosing an item and
+         * then confirming it with a reason.
+         *
+         * @param name the action name, unique among selects
+         * @param ack how to acknowledge the interaction
+         * @param handler the work
+         * @return this builder
+         * @throws IllegalArgumentException if the name is empty, contains a colon, or is
+         *     already declared
+         */
+        public Builder select(String name, Ack ack, SelectHandler handler) {
+            requireName(name, "select");
+            Objects.requireNonNull(ack, "ack of select action '" + name + "'");
+            Objects.requireNonNull(handler, "handler of select action '" + name + "'");
+            if (selects.putIfAbsent(name, new SelectAction(ack, handler)) != null) {
+                throw new IllegalArgumentException("Duplicate select action '" + name + "'");
+            }
+            return this;
+        }
+
         private void requireName(String name, String kind) {
             Objects.requireNonNull(name, kind + " action name");
             if (name.isEmpty()) {
@@ -141,7 +194,7 @@ public final class ActionTable {
          * @return the action table
          */
         public ActionTable build() {
-            return new ActionTable(buttons, modals);
+            return new ActionTable(buttons, modals, selects);
         }
     }
 }

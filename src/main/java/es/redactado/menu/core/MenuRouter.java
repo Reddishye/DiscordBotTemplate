@@ -2,15 +2,12 @@ package es.redactado.menu.core;
 
 import es.redactado.menu.api.Ack;
 import es.redactado.menu.api.ActionTable;
-import es.redactado.menu.api.ButtonAction;
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.MenuNotFoundException;
-import es.redactado.menu.api.ModalAction;
 import es.redactado.menu.preset.InMemoryPresetPreferences;
 import es.redactado.menu.preset.Preset;
 import es.redactado.menu.preset.PresetRegistry;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -23,7 +20,7 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
-import net.dv8tion.jda.api.interactions.DiscordLocale;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -272,55 +269,7 @@ public final class MenuRouter implements AutoCloseable {
      * @return {@code true} when the event was consumed
      */
     public boolean dispatchButton(ButtonInteractionEvent event) {
-        Optional<ComponentId> parsed = ComponentId.decode(event.getComponentId());
-        if (parsed.isEmpty()) {
-            return false;
-        }
-
-        Registered registered = menus.get(parsed.get().menuId());
-        if (registered == null) {
-            LOG.warn("No menu registered for id: {}", parsed.get().menuId());
-            return false;
-        }
-
-        Optional<ButtonAction> action = registered.table().button(parsed.get().action());
-        if (action.isEmpty()) {
-            LOG.warn(
-                    "Menu '{}' has no button action '{}'",
-                    parsed.get().menuId(),
-                    parsed.get().action());
-            Replies.ephemeral(event, messages, localeOf(event), MessageKeys.ERROR_UNKNOWN_ACTION);
-            return true;
-        }
-
-        long messageId = messageIdOf(event.getMessage());
-        if (!admit(registered.menu(), event, messageId)) {
-            return true;
-        }
-
-        Ack ack = action.get().ack();
-        acknowledge(ack, event);
-        submit(
-                event,
-                messageId,
-                parsed.get(),
-                registered.menu(),
-                () ->
-                        resolve(event, registered.menu())
-                                .thenApply(
-                                        preset ->
-                                                action.get()
-                                                        .handler()
-                                                        .handle(
-                                                                BaseContext.fromButton(
-                                                                        event,
-                                                                        parsed.get(),
-                                                                        sessions,
-                                                                        navigator,
-                                                                        messages,
-                                                                        preset),
-                                                                event)));
-        return true;
+        return run(new Incoming.Button(event));
     }
 
     /**
@@ -330,54 +279,91 @@ public final class MenuRouter implements AutoCloseable {
      * @return {@code true} when the event was consumed
      */
     public boolean dispatchModal(ModalInteractionEvent event) {
-        Optional<ComponentId> parsed = ComponentId.decode(event.getModalId());
+        return run(new Incoming.Modal(event));
+    }
+
+    /**
+     * Handles a string select submission if it belongs to a registered menu.
+     *
+     * @param event the JDA select event
+     * @return {@code true} when the event was consumed
+     */
+    public boolean dispatchSelect(StringSelectInteractionEvent event) {
+        return run(new Incoming.Select(event));
+    }
+
+    /**
+     * The one pipeline every interaction takes.
+     *
+     * <p>Six steps, in this order and for every kind:
+     *
+     * <ol>
+     *   <li>decode the custom id, so an id that is not ours is left alone;
+     *   <li>find the menu, and leave the interaction alone if it is not registered;
+     *   <li>find the action, answering the user if the menu declares nothing under that
+     *       name, because at that point the menu has consumed the interaction;
+     *   <li>admit: check ownership and claim the message, both before acknowledging so a
+     *       rejection costs nothing;
+     *   <li>acknowledge, on the JDA thread, inside Discord's three second budget;
+     *   <li>resolve the preset and hand over on the executor, since a handler may block.
+     * </ol>
+     *
+     * <p>Steps one and two return false, meaning the caller may keep listening; from step
+     * three the menu owns the interaction and the answer is always true.
+     */
+    private boolean run(Incoming incoming) {
+        Optional<ComponentId> parsed = ComponentId.decode(incoming.sourceId());
         if (parsed.isEmpty()) {
             return false;
         }
 
         Registered registered = menus.get(parsed.get().menuId());
         if (registered == null) {
-            LOG.warn("No menu registered for modal id: {}", parsed.get().menuId());
+            LOG.warn("No menu registered for {} id: {}", incoming.kind(), parsed.get().menuId());
             return false;
         }
 
-        Optional<ModalAction> action = registered.table().modal(parsed.get().action());
+        Optional<Incoming.Resolved> action =
+                incoming.resolve(registered.table(), parsed.get().action());
         if (action.isEmpty()) {
             LOG.warn(
-                    "Menu '{}' has no modal action '{}'",
+                    "Menu '{}' has no {} action '{}'",
                     parsed.get().menuId(),
+                    incoming.kind(),
                     parsed.get().action());
-            Replies.ephemeral(event, messages, localeOf(event), MessageKeys.ERROR_UNKNOWN_ACTION);
+            Replies.ephemeral(
+                    incoming.event(),
+                    messages,
+                    incoming.locale(),
+                    MessageKeys.ERROR_UNKNOWN_ACTION);
             return true;
         }
 
-        long messageId = messageIdOf(event.getMessage());
-        if (!admit(registered.menu(), event, messageId)) {
+        long messageId = incoming.messageId();
+        if (!admit(registered.menu(), incoming, messageId)) {
             return true;
         }
 
-        Ack ack = action.get().ack();
-        acknowledge(ack, event);
+        incoming.acknowledge(action.get().ack());
         submit(
-                event,
+                incoming,
                 messageId,
                 parsed.get(),
                 registered.menu(),
+                action.get(),
                 () ->
-                        resolve(event, registered.menu())
+                        resolve(incoming, registered.menu())
                                 .thenApply(
                                         preset ->
                                                 action.get()
-                                                        .handler()
-                                                        .handle(
-                                                                BaseContext.fromModal(
-                                                                        event,
+                                                        .invoke()
+                                                        .apply(
+                                                                incoming.context(
                                                                         parsed.get(),
                                                                         sessions,
                                                                         navigator,
                                                                         messages,
-                                                                        preset),
-                                                                event)));
+                                                                        preset))));
         return true;
     }
 
@@ -390,21 +376,39 @@ public final class MenuRouter implements AutoCloseable {
      *
      * @return {@code true} when the interaction may proceed
      */
-    private boolean admit(Menu menu, IReplyCallback event, long messageId) {
-        if (!owns(menu, messageId(event), event)) {
-            Replies.ephemeral(event, messages, localeOf(event), MessageKeys.ERROR_NOT_OWNER);
+    private boolean admit(Menu menu, Incoming incoming, long messageId) {
+        if (!owns(menu, incoming.message(), incoming.event())) {
+            Replies.ephemeral(
+                    incoming.event(), messages, incoming.locale(), MessageKeys.ERROR_NOT_OWNER);
             return false;
         }
-        if (messageId != NO_MESSAGE && !guard.tryAcquire(messageId)) {
-            LOG.debug("Dropping a duplicate interaction on message {}", messageId);
-            if (event instanceof ButtonInteractionEvent button) {
-                button.deferEdit().queue();
-            } else if (event instanceof ModalInteractionEvent modal) {
-                modal.deferEdit().queue();
-            }
+        if (messageId != Incoming.NO_MESSAGE && !guard.tryAcquire(messageId)) {
+            LOG.debug(
+                    "Dropping a duplicate {} interaction on message {}",
+                    incoming.kind(),
+                    messageId);
+            deferEdit(incoming.event());
             return false;
         }
         return true;
+    }
+
+    /**
+     * Swallows a duplicate click by deferring the edit.
+     *
+     * <p>The first click already owns the message and will produce the visible result,
+     * so the second one must not answer the user with an error; deferring simply closes
+     * it quietly. A select cannot defer an edit, so it is acknowledged instead, which is
+     * the closest legal no-op.
+     */
+    private static void deferEdit(IReplyCallback event) {
+        if (event instanceof ButtonInteractionEvent button) {
+            button.deferEdit().queue();
+        } else if (event instanceof ModalInteractionEvent modal) {
+            modal.deferEdit().queue();
+        } else if (event instanceof StringSelectInteractionEvent select) {
+            select.deferReply(true).queue();
+        }
     }
 
     /**
@@ -431,14 +435,8 @@ public final class MenuRouter implements AutoCloseable {
         return owner.getIdLong() == event.getUser().getIdLong();
     }
 
-    private static Message messageId(IReplyCallback event) {
-        return event instanceof ButtonInteractionEvent button
-                ? button.getMessage()
-                : event instanceof ModalInteractionEvent modal ? modal.getMessage() : null;
-    }
-
     private static long messageIdOf(Message message) {
-        return message == null ? NO_MESSAGE : message.getIdLong();
+        return message == null ? Incoming.NO_MESSAGE : message.getIdLong();
     }
 
     /**
@@ -447,10 +445,11 @@ public final class MenuRouter implements AutoCloseable {
      * completes its future.
      */
     private void submit(
-            IReplyCallback event,
+            Incoming incoming,
             long messageId,
             ComponentId id,
             Menu menu,
+            Incoming.Resolved action,
             Supplier<CompletableFuture<CompletableFuture<Void>>> work) {
         AtomicBoolean released = new AtomicBoolean();
         Runnable release = () -> releaseOnce(messageId, released);
@@ -464,9 +463,9 @@ public final class MenuRouter implements AutoCloseable {
                                             (ignored, error) -> {
                                                 if (error != null) {
                                                     ErrorReply.send(
-                                                            event,
+                                                            incoming.event(),
                                                             messages,
-                                                            localeOf(event),
+                                                            incoming.locale(),
                                                             error,
                                                             id.menuId(),
                                                             id.action());
@@ -478,9 +477,9 @@ public final class MenuRouter implements AutoCloseable {
                             // solely in the dispatcher. A handler that throws before
                             // returning a future never produces one to observe.
                             ErrorReply.send(
-                                    event,
+                                    incoming.event(),
                                     messages,
-                                    localeOf(event),
+                                    incoming.locale(),
                                     error,
                                     id.menuId(),
                                     id.action());
@@ -490,7 +489,8 @@ public final class MenuRouter implements AutoCloseable {
         } catch (RejectedExecutionException error) {
             LOG.warn("Executor rejected action '{}' of menu '{}'", id.action(), id.menuId(), error);
             release.run();
-            Replies.ephemeral(event, messages, localeOf(event), MessageKeys.ERROR_BUSY);
+            Replies.ephemeral(
+                    incoming.event(), messages, incoming.locale(), MessageKeys.ERROR_BUSY);
         }
     }
 
@@ -540,16 +540,8 @@ public final class MenuRouter implements AutoCloseable {
      * the exception would reach the same error handling as a handler failure and the
      * user would get the generic message rather than silence.
      */
-    private CompletableFuture<Preset> resolve(IReplyCallback event, Menu menu) {
-        long guildId = event.getGuild() == null ? 0L : event.getGuild().getIdLong();
-        return presets.resolve(menu, guildId, event.getUser().getIdLong());
-    }
-
-    /** The locale of the interacting user, or the guild's, or English. */
-    private static Locale localeOf(IReplyCallback event) {
-        return Locales.resolve(
-                event.getUserLocale(),
-                event.getGuild() == null ? DiscordLocale.UNKNOWN : event.getGuildLocale());
+    private CompletableFuture<Preset> resolve(Incoming incoming, Menu menu) {
+        return presets.resolve(menu, incoming.guildId(), incoming.userId());
     }
 
     /**

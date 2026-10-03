@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.entities.Guild;
@@ -13,6 +14,7 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageEditAction;
@@ -81,6 +83,45 @@ final class JdaMocks {
 
         ModalInteractionEvent event = mock(ModalInteractionEvent.class);
         when(event.getModalId()).thenReturn(modalId);
+        when(event.isAcknowledged()).thenReturn(acknowledged);
+        when(event.getHook()).thenReturn(hook);
+        when(event.getMessage()).thenReturn(message);
+        when(event.getUser()).thenReturn(clicker);
+        when(event.getGuild()).thenReturn(guild);
+        when(event.deferEdit()).thenReturn(deferEdit);
+        when(event.deferReply(true)).thenReturn(reply);
+        when(event.reply(anyString())).thenReturn(reply);
+        return event;
+    }
+
+    /**
+     * Builds a string select submission on a message owned by {@code ownerId}.
+     *
+     * <p>Same shape as {@link #button} so the select tests read like the button ones and
+     * a difference in behaviour shows up as a difference in the test rather than in the
+     * mock.
+     */
+    static StringSelectInteractionEvent select(
+            String componentId, boolean acknowledged, String... values) {
+        return select(componentId, acknowledged, NO_MESSAGE, NO_OWNER, values);
+    }
+
+    static StringSelectInteractionEvent select(
+            String componentId,
+            boolean acknowledged,
+            long messageId,
+            long ownerId,
+            String... values) {
+        InteractionHook hook = hook();
+        MessageEditCallbackAction deferEdit = mock(MessageEditCallbackAction.class);
+        ReplyCallbackAction reply = replyAction();
+        Message message = message(messageId, ownerId);
+        User clicker = clicker();
+        Guild guild = guild();
+
+        StringSelectInteractionEvent event = mock(StringSelectInteractionEvent.class);
+        when(event.getComponentId()).thenReturn(componentId);
+        when(event.getValues()).thenReturn(List.of(values));
         when(event.isAcknowledged()).thenReturn(acknowledged);
         when(event.getHook()).thenReturn(hook);
         when(event.getMessage()).thenReturn(message);
