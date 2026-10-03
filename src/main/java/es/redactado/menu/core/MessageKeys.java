@@ -38,4 +38,8 @@ public final class MessageKeys {
     // menu.field and menu.list: default view text
     public static final String FIELD_NOT_SET = "menu.field.not_set";
     public static final String LIST_EMPTY = "menu.list.empty";
+
+    // menu.pager: labels for the page arrows when the preset defines no icon for them
+    public static final String PAGER_PREVIOUS = "menu.pager.previous";
+    public static final String PAGER_NEXT = "menu.pager.next";
 }

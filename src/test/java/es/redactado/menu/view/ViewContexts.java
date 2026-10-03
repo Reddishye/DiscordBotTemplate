@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import es.redactado.menu.api.MenuContext;
+import es.redactado.menu.api.Session;
 import es.redactado.menu.core.Messages;
 import es.redactado.menu.preset.BuiltinPresets;
 import es.redactado.menu.preset.Preset;
@@ -47,16 +48,22 @@ final class ViewContexts {
         MenuContext ctx = mock(MenuContext.class);
         User user = mock(User.class);
         Guild guild = mock(Guild.class);
+        // A real session, not a mock: pagers read and write page state through it, and a
+        // mocked session returns null and fails somewhere inside the component.
+        Session session = new Session();
         when(user.getEffectiveName()).thenReturn("Ada");
         when(user.getIdLong()).thenReturn(42L);
         when(guild.getIdLong()).thenReturn(99L);
         when(ctx.menuId()).thenReturn("m");
+        // A rendered view has an action; a pager embeds it in its button ids.
+        when(ctx.action()).thenReturn("home");
         when(ctx.preset()).thenReturn(preset);
         when(ctx.locale()).thenReturn(locale);
         when(ctx.discordUser()).thenReturn(user);
         when(ctx.guild()).thenReturn(guild);
         when(ctx.guildId()).thenReturn("99");
         when(ctx.userId()).thenReturn("42");
+        when(ctx.session()).thenReturn(session);
         when(ctx.t(anyString(), any(Object[].class)))
                 .thenAnswer(
                         call -> {

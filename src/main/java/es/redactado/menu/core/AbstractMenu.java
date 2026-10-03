@@ -5,6 +5,7 @@ import es.redactado.menu.api.ActionTable;
 import es.redactado.menu.api.Loader;
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
+import es.redactado.menu.api.NavEntry;
 import es.redactado.menu.api.Renderer;
 import es.redactado.menu.api.UserFacingException;
 import java.time.Duration;
@@ -35,6 +36,9 @@ public abstract class AbstractMenu implements Menu {
     /** The action name of the built-in back navigation button. */
     protected static final String NAV_ACTION = "nav";
 
+    /** The action name of the built-in pager buttons. */
+    protected static final String PAGE_ACTION = "page";
+
     private static final Logger LOG = LoggerFactory.getLogger(AbstractMenu.class);
     private static final Duration DEFAULT_LOAD_TIMEOUT = Duration.ofSeconds(10);
 
@@ -56,6 +60,7 @@ public abstract class AbstractMenu implements Menu {
     @Override
     public final void actions(ActionTable.Builder table) {
         table.button(NAV_ACTION, Ack.DEFER_EDIT, AbstractMenu::navigate);
+        table.button(PAGE_ACTION, Ack.DEFER_EDIT, this::changePage);
         declare(table);
     }
 
@@ -69,12 +74,41 @@ public abstract class AbstractMenu implements Menu {
     }
 
     /**
-     * Declares the subclass's own actions. The built-in {@code nav} action is
-     * already registered and must not be declared again.
+     * Declares the subclass's own actions.
+     *
+     * <p>{@code nav} and {@code page} are already registered and must not be declared
+     * again: a subclass redeclaring one would replace the built-in behaviour with its own
+     * and silently break navigation or paging, so the duplicate-action error is left to
+     * fire rather than being papered over.
      *
      * @param table the builder to declare actions on
      */
     protected abstract void declare(ActionTable.Builder table);
+
+    /**
+     * Handles the built-in {@code page} action.
+     *
+     * <p>Stores the requested page and re-renders the view the user was looking at. The
+     * requested page is stored as it arrived, even when it is out of range: clamping here
+     * would make the stored value disagree with the button the user pressed, and the
+     * pager clamps on read anyway, which is where the range is known.
+     *
+     * <p>The view to re-render travels in the id, so this does not need to know which
+     * view it was called from.
+     */
+    private CompletableFuture<Void> changePage(MenuContext ctx, ButtonInteractionEvent event) {
+        PageAction page = PageAction.fromContext(ctx);
+        String key = PageAction.stateKey(page.pagerId());
+        int current = ctx.session().state(key, Integer.class).orElse(0);
+        ctx.session().putState(key, current + page.direction().delta());
+
+        // This menu renders the view it is paging, so the target is itself. Going through
+        // navigate instead would lose the view's action and params, and a pager inside a
+        // parameterised view would jump to the wrong page.
+        NavEntry entry = new NavEntry(ctx.menuId(), page.viewAction(), page.viewParams());
+        return render(ctx.at(entry))
+                .thenCompose(container -> ViewEditor.edit(ctx.event().getHook(), container));
+    }
 
     /**
      * How long {@link #view(MenuContext, Loader, Renderer)} waits for its loader.
