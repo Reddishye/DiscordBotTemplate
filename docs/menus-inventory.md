@@ -123,10 +123,20 @@ The menu packages depend on each other in one direction only, which the prep
 commit established:
 
 ```
-api   ->  (no other menu package)
-core  ->  api
-view  ->  api, core
+preset ->  (no other menu package; JDA and the JDK only)
+api    ->  (no other menu package)
+core   ->  api
+view   ->  api, core
 ```
+
+`preset` is a leaf: it holds data about how a menu looks and deliberately imports
+nothing from the rest of the framework, so a preset can be read, tested, and
+serialised on its own. `api`, `core`, and `view` are free to import it; none of them
+does yet, because components start reading presets in T10.
+
+`EmojiText` and `DefaultLook` are package-private inside `preset`. `EmojiText`
+exists because JDA does not validate emoji, and `DefaultLook` exists to break a
+class-initialisation cycle between `Preset` and `BuiltinPresets`.
 
 `Session`, `NavEntry`, and `NavigationMode` sit in `api` rather than `core`
 because `MenuContext` exposes all three. Moving them keeps the invariant above
@@ -172,7 +182,11 @@ src/main/java/es/redactado/menu/
                                    SessionStore, SessionConfig, Navigator,
                                    ComponentId, Replies, ErrorReply,
                                    NavigationAction, AbstractMenu, BaseContext
-  view/                           MenuBuilder, components, Limits, Validator
+  preset/                         Preset, Icons, Palette, Density, Gap,
+                                   DividerStyle, HeaderStyle, ButtonRole,
+                                   ButtonStyles, BuiltinPresets,
+                                   PresetRegistry, IconKey
+  view/                           MenuBuilder, components, Validator
   RowItem.java                   Action-row children: buttons and selects
   Accessory.java                 Section accessories: buttons and thumbnails
 ```

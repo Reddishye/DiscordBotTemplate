@@ -767,6 +767,101 @@ an async suite flaky rather than failing loudly:
   records the current view and renders only the target; the current view is never
   re-rendered on the way out.
 
+### JDA does not validate emoji, so the preset package does
+
+Checked empirically rather than assumed. `Emoji.fromFormatted` only rejects an empty
+string; anything else is accepted:
+
+```
+Emoji.fromFormatted("garbage") -> UnicodeEmoji(codepoints=U+67U+61U+72U+62U+61U+67U+65)
+```
+
+`UnicodeEmojiImpl` stores whatever name it is handed. A typo in a preset file would
+therefore reach Discord silently and render as the wrong thing, so `Icons` validates
+before resolving: `EmojiText` accepts a custom emoji mention, or a string whose every
+code point falls in a range emoji live in.
+
+**The range set is coarse on purpose.** It is there to catch a typo, a truncated
+escape, or a plain English word, not to be a complete Unicode emoji validator. A
+newer emoji outside the listed ranges would be rejected, which is the safe failure:
+the fix is one line in `EmojiText`, whereas accepting garbage is invisible.
+
+### Two class-initialisation cycles, both caught by tests
+
+Both were introduced by T7 and both would have been invisible without a test that
+touches the built-ins directly.
+
+1. `Preset.builder` read `BuiltinPresets.DEFAULT`, while `BuiltinPresets.<clinit>`
+   builds its presets through `Preset.builder`. Whichever lost the race saw `null`.
+2. After fixing that by moving the shared values into `DefaultLook`, a second
+   failure appeared: `new EnumMap<>(Map.of())` throws, because EnumMap's copy
+   constructor infers the key type from its argument and an empty map carries none.
+   `ButtonStyles.identity` is exactly an empty map, so it failed on construction.
+   Fixed by naming the key type: `new EnumMap<>(ButtonRole.class)` then `putAll`.
+
+The lesson worth keeping: a class whose static initialiser builds instances of
+another class that refers back to it will fail in a way that looks like a null
+pointer rather than an initialisation problem.
+
+### Two public methods were removed after auditing T7 against the written spec
+
+`Preset` shipped with `renderFooter(userId, menuId)` and `iconValues()` that the
+agreed API did not call for. Both are gone.
+
+- `iconValues()` was pure duplication of `icons().asMap()`, one call deeper.
+- `renderFooter(...)` was not duplication but was still out of scope: validating
+  placeholders is the preset's business, because a bad footer must be rejected at
+  construction, while *rendering* one is a view concern and belongs in T10 where the
+  footer is actually laid out.
+
+Placeholder validation is unchanged and still tested, so an invalid `{...}` is
+still rejected at construction. A preset can also be serialised in T8 with
+`icons().asMap()`, without either method having existed.
+
+The rule I applied: publish the API the task specifies, and let a later task add a
+method when it has a caller. Public surface with no caller is surface nobody tests.
+
+### `DEFAULT` is now built by overriding nothing, so the two cannot drift
+
+Three separate literals used to describe the default look: `Palette`, `Icons`, and
+the description string, each written out in `BuiltinPresets` while `Preset` held its
+own copy of the defaults. `Preset.builder` therefore started from the values and
+`DEFAULT` restated them, which is exactly the drift the design was supposed to
+prevent.
+
+Now `DefaultLook` owns the values once, `Preset.builder` reads them, and `DEFAULT` is
+`Preset.builder("default").build()` with no override at all. There is one copy of
+each default value in the codebase.
+
+### `all()` sorts once per reload instead of once per call
+
+The registry's own javadoc claimed reads do "no copy, and no allocation" while
+`all()` ran a stream, a sort, and a list copy on every invocation. The class was
+wrong, not the implementation being aspirational. `Snapshot` now precomputes the
+sorted list while the set is immutable, so every accessor really is one volatile read
+plus a field access. Asserted by `allIsPreComputed`, which checks identity rather
+than equality.
+
+### `AsciiSourcesTest` forced four edits to pre-existing template files
+
+The rule is codebase-wide, so it applies to the template's own code, and four files
+failed it. All were cosmetic and none changes behaviour:
+
+| File | Was | Now |
+| --- | --- | --- |
+| `Main.java` | five `// -- Phase N -- --` banners with box drawing and an em dash | plain sentence comments |
+| `ServiceManager.java` | an em dash in a comment | a comma |
+| `PingCommand.java` | three emoji in the reply text | `Character.toString(0x...)` |
+| `CommandListener.java` | a warning-sign emoji in the error message | `Character.toString(0x26A0)` |
+
+The `Main.java` banners were decorative comments, which section 2.1 forbids
+anyway, so removing them fixes two rules at once. The emoji replacements render
+byte-identical output.
+
+This is a change outside the `menu` package in a commit about presets. It was
+unavoidable: scoping the scan to `menu` would have left the codebase rule unenforced
+and invited the same violation later.
+
 ### Hardcoded emoji that must move into presets
 
 Left in place by T1 because removing them changes rendered output:

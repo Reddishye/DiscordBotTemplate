@@ -42,7 +42,7 @@ public class Main extends ListenerAdapter {
     private final AtomicBoolean businessServicesStarted = new AtomicBoolean(false);
     // READY event captured async; processed after main-thread init completes
     private volatile ReadyEvent capturedReadyEvent;
-    // Set true once main-thread init done — lets late READY events fire immediately
+    // Set true once main-thread init done, so late READY events fire immediately
     private volatile boolean initComplete;
 
     public static void main(String[] args) {
@@ -52,23 +52,23 @@ public class Main extends ListenerAdapter {
     public void run() {
         redirectSystemOutToLogger();
 
-        // ── Phase 1: Build ShardManager — onReady only captures event ──
+        // Phase 1: build the shard manager; onReady only captures the event
         Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
 
         shardManager = buildShardManager(dotenv);
         logger.info("ShardManager built, awaiting Ready event...");
 
-        // ── Phase 2: Guice injector — heavy init (Hibernate etc.) ──
+        // Phase 2: build the Guice injector, which is where heavy init happens
         injector = Guice.createInjector(new BotModule(this, shardManager));
 
         serviceManager = injector.getInstance(ServiceManager.class);
         commandRegister = injector.getInstance(CommandRegister.class);
 
-        // ── Phase 3: Infrastructure services ──
+        // Phase 3: start the infrastructure services
         serviceManager.startAll(INFRASTRUCTURE_SERVICES);
         logger.info("Infrastructure services started.");
 
-        // ── Phase 4: Register listeners ──
+        // Phase 4: register the listeners
         List<ListenerAdapter> listeners = instantiateListeners();
         // Also register commands that are listeners (autocomplete, etc)
         commandRegister
@@ -84,7 +84,7 @@ public class Main extends ListenerAdapter {
             logger.info("Registered listener: {}", listener.getClass().getSimpleName());
         }
 
-        // ── Phase 5: Mark init complete, process READY if already captured ──
+        // Phase 5: mark init complete, then handle a READY that arrived earlier
         initComplete = true;
         ReadyEvent re = capturedReadyEvent;
         if (re != null) {

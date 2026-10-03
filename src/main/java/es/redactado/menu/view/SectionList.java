@@ -71,11 +71,11 @@ public class SectionList<T> implements MenuComponent {
         String pageText = "%d/%d".formatted(page + 1, totalPages);
         List<RowItem> nav = new ArrayList<>();
         if (page > 0) {
-            nav.add(c -> pageButton(c, page - 1, "◀"));
+            nav.add(c -> pageButton(c, page - 1, Character.toString(0x25C0)));
         }
         nav.add(c -> Button.of(ButtonStyle.SECONDARY, NO_ACTION, pageText));
         if (page < totalPages - 1) {
-            nav.add(c -> pageButton(c, page + 1, "▶"));
+            nav.add(c -> pageButton(c, page + 1, Character.toString(0x25B6)));
         }
         return nav.toArray(new RowItem[0]);
     }
