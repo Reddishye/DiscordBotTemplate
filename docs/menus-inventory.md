@@ -155,8 +155,11 @@ src/test/java/es/redactado/menu/view/
   MenuBuilderTest.java
 src/main/java/es/redactado/menu/
   api/                            Menu, MenuContext, MenuComponent, Ack,
-                                   ActionTable, Limits, exceptions
-  core/                           MenuRouter, ComponentId, navigation, base classes
+                                   ActionTable, ButtonAction, ModalAction,
+                                   ButtonHandler, ModalHandler, Done, Limits,
+                                   exceptions
+  core/                           MenuRouter, ComponentId, Replies, navigation,
+                                   AbstractMenu, BaseContext
   view/                           MenuBuilder, components, Limits, Validator
   RowItem.java                   Action-row children: buttons and selects
   Accessory.java                 Section accessories: buttons and thumbnails
@@ -294,10 +297,10 @@ is the final path; the "Name" column is the final type name where it differs.
 | --- | --- | --- | --- |
 | `api/Component.java` | `api/MenuComponent.java` | `MenuComponent` | render contract fixed in T10 |
 | `api/Context.java` | `api/MenuContext.java` | `MenuContext` | state and back-stack moved to sessions in T5 |
-| `api/Menu.java` | `api/Menu.java` | `Menu` | gains an action table in T3 |
+| `api/Menu.java` | `api/Menu.java` | `Menu` | **T3**: `onButton`/`onModal` replaced by `actions(ActionTable.Builder)` |
 | `api/NavigationAware.java` | `api/NavigationAware.java` | `NavigationAware` | becomes the `onEnter`/`onLeave` hook in T5, or is removed |
 | `api/Renderable.java` | `api/Renderable.java` | `Renderable` | unused, removed in T14 |
-| `base/AbstractMenu.java` | `core/AbstractMenu.java` | `AbstractMenu` | replaced by the dispatcher in T4 |
+| `base/AbstractMenu.java` | `core/AbstractMenu.java` | `AbstractMenu` | **T3** registers the built-in `nav` action; replaced by the dispatcher in T4 |
 | `base/BaseContext.java` | `core/BaseContext.java` | `BaseContext` | becomes the `MenuContext` implementation in T5 |
 | `builder/MenuBuilder.java` | `view/MenuBuilder.java` | `MenuBuilder` | made preset-aware in T10 |
 | `component/ActionButton.java` | `view/ActionButton.java` | `ActionButton` | broken cast, fixed in T10 |
@@ -310,7 +313,7 @@ is the final path; the "Name" column is the final type name where it differs.
 | `component/Text.java` | `view/Text.java` | `Text` | as-is |
 | `component/ThumbnailComponent.java` | `view/ThumbnailComponent.java` | `ThumbnailComponent` | broken cast, folded into `Section` in T10 |
 | `dispatch/ComponentId.java` | `core/ComponentId.java` | `ComponentId` | **rewritten in T2**: `indexOf`/`substring` only, `decode` returns `Optional` |
-| `dispatch/MenuRouter.java` | `core/MenuRouter.java` | `MenuRouter` | rewritten as the O(1) dispatcher in T4 |
+| `dispatch/MenuRouter.java` | `core/MenuRouter.java` | `MenuRouter` | **T3** dispatches through immutable action tables and performs the ack; executor in T4 |
 | `exception/ComponentLimitException.java` | `api/ComponentLimitException.java` | `ComponentLimitException` | kept |
 | `exception/MenuException.java` | `api/MenuException.java` | `MenuException` | kept as the base type |
 | `exception/MenuNotFoundException.java` | `api/MenuNotFoundException.java` | `MenuNotFoundException` | kept |
@@ -340,9 +343,19 @@ Carried over from the source, and each one contradicts a rule of the plan:
 - `ComponentId.decode` returned `null` for a bad prefix, so callers could not tell
   a foreign component from a malformed one. Section 5.3 requires an explicit
   result. **Fixed in T2:** it now returns `Optional<ComponentId>`.
-- `MenuRouter` holds menus in a `ConcurrentHashMap` and resolves them by
-  exception on miss. Section 3 requires immutable snapshots and O(1) lookups
-  without exceptions on the hot path.
+- `MenuRouter` held menus in a `ConcurrentHashMap` and resolved them by exception
+  on miss, and dispatched with a `switch` on the action string. Section 3 requires
+  immutable snapshots and O(1) lookups without exceptions on the hot path.
+  **Fixed in T3:** each menu builds one immutable `ActionTable` at registration,
+  and dispatch is two map lookups with no string matching. The `ConcurrentHashMap`
+  itself is retained for now, because registration happens at startup and is not
+  the hot path; T4 may switch it to an immutable snapshot.
+- `ProfileMenu.onButton` had a `switch` with a `default ->` branch that opened a
+  modal for any unrecognised action. Section 5.4 and T3 forbid that. **Fixed in
+  T3:** every action must be declared with an explicit `Ack`, and an unknown action
+  now produces a localized warning reply instead of opening a modal.
+- A handler that threw synchronously escaped the router entirely, because the
+  failure handler was only attached to the returned future. **Fixed in T3.**
 - `MenuRouter.dispatchButton` catches `Exception` and replies with
   `"❌ Error: " + e.getMessage()`, exposing internal messages to users.
   Section 2.2 and 5.5 require a single `ErrorReply` path with a reference code.
@@ -352,9 +365,6 @@ Carried over from the source, and each one contradicts a rule of the plan:
 - `BaseContext` keeps a `ConcurrentHashMap` state map and an `ArrayDeque`
   back-stack on the per-event object, so state dies with the event.
   Section 3 requires session-scoped state.
-- `ProfileMenu.onButton` uses a `switch` on the action string with a
-  `default ->` branch that opens a modal. Section 5.4 and T3 forbid implicit
-  "default opens a modal".
 - `ProfileMenu.buildSummary` calls `ctx.guild().retrieveMemberById(userId).complete()`,
   a blocking REST call on the event thread, explicitly forbidden by section 3.
 - `ProfileMenu` replies with Spanish literals (`"Anadir enlace"`,

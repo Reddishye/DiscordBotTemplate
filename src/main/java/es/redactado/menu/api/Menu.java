@@ -1,12 +1,10 @@
 package es.redactado.menu.api;
 
 import net.dv8tion.jda.api.components.container.Container;
-import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
-import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 
 /**
- * A named, renderable menu that handles button and modal interactions. Register
- * it with the router by id.
+ * A named, renderable menu that declares the actions it handles. Register it
+ * with the router by id.
  */
 public interface Menu {
 
@@ -26,18 +24,13 @@ public interface Menu {
     Container render(MenuContext ctx);
 
     /**
-     * Handles a button click belonging to this menu.
+     * Declares every action this menu handles, together with how each one is
+     * acknowledged.
      *
-     * @param ctx the context of the current interaction
-     * @param event the JDA button event
-     */
-    default void onButton(MenuContext ctx, ButtonInteractionEvent event) {}
-
-    /**
-     * Handles a modal submission belonging to this menu.
+     * <p>Called exactly once by the router at registration, never from a
+     * constructor, so the table can be immutable for the lifetime of the menu.
      *
-     * @param ctx the context of the current interaction
-     * @param event the JDA modal event
+     * @param table the builder to declare actions on
      */
-    default void onModal(MenuContext ctx, ModalInteractionEvent event) {}
+    void actions(ActionTable.Builder table);
 }

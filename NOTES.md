@@ -424,6 +424,107 @@ include the offending id, because an over-length id is by definition large and
 would flood the log or the exception message. The segment failures name the
 segment, and a bad param also names its index.
 
+### Ephemeral follow-ups after `deferEdit`, verified in JDA 6.4.2
+
+The plan asked for this to be verified rather than assumed. It is supported.
+
+`WebhookMessageCreateAction#setEphemeral` carries this Javadoc:
+
+> For a `deferReply()` deferred reply, this is not supported. When a reply is
+> deferred, the very first message sent through the `InteractionHook`, inherits
+> the ephemeral state of the initial reply.
+
+That caveat is about the *first* message after `deferReply()`, which becomes the
+deferred reply itself. It does not apply here. Verified in
+`WebhookMessageCreateActionImpl`:
+
+- `setEphemeral(true)` throws `IllegalStateException` only when
+  `isInteraction` is false.
+- `isInteraction` is set to false in exactly one place:
+  `IncomingWebhookClientImpl`. `InteractionHookImpl` never does, so hook sends
+  keep `isInteraction == true`.
+- When `ephemeral` is true, `finalizeData()` writes
+  `flags |= MessageFlag.EPHEMERAL` into the request body.
+
+So `hook.sendMessage(text).setEphemeral(true)` is accepted and serialized for an
+interaction hook, including after `deferEdit()`. `Replies.ephemeral` and
+`AbstractMenu#handleBack` both rely on it.
+
+Note that with `Ack.DEFER_REPLY` the whole hook is already ephemeral because the
+router defers with `deferReply(true)`, so the extra `setEphemeral(true)` there is
+redundant but harmless.
+
+### JDA has no single interface exposing both `deferEdit` and `deferReply`
+
+Relevant to the router's two `acknowledge` overloads:
+
+```
+IDeferrableCallback extends Interaction     declares getHook()
+IReplyCallback      extends IDeferrableCallback   declares reply(), deferReply(boolean)
+IMessageEditCallback extends IDeferrableCallback  declares editComponents(...), deferEdit()
+
+ComponentInteraction extends IReplyCallback, IMessageEditCallback, IModalCallback, ICustomIdInteraction
+  ButtonInteraction extends ComponentInteraction
+ModalInteraction   extends IReplyCallback, IMessageEditCallback, ICustomIdInteraction
+```
+
+`deferEdit` lives only on `IMessageEditCallback` and `deferReply` only on
+`IReplyCallback`, so there is no common interface declaring both. `acknowledge`
+therefore takes the concrete event type, as two short overloads rather than one
+method with an `instanceof` inside.
+
+`ModalInteractionEvent` does **not** implement `IModalCallback`, so it cannot
+open a modal. `AbstractMenu#showModal` keeps the `instanceof IModalCallback`
+check and throws `IllegalStateException` when the interaction type cannot open
+one.
+
+### A handler that throws synchronously escaped the router
+
+Found by the T3 failure tests. Attaching `whenComplete` to the returned future
+only covers failures that arrive through the future. A handler that throws before
+returning one produces no future, so the exception propagated out of
+`dispatchButton` and the interaction was never answered.
+
+`MenuRouter#run` now takes a `Supplier<CompletableFuture<Void>>`, catches around
+the call, and reports both shapes through `Replies.ephemeral`. This is the only
+`catch (Exception)` in the menu package, which section 2.2 permits solely in the
+top-level dispatcher.
+
+### Null ack and null handler throw `NullPointerException`, not `IllegalArgumentException`
+
+The plan asked for `IllegalArgumentException` on a null ack or handler. The
+builder uses `Objects.requireNonNull`, so those two cases throw
+`NullPointerException` with the action name in the message, while the empty name,
+colon, duplicate, and `Ack.MODAL` cases throw `IllegalArgumentException` as
+specified.
+
+**Reason.** Section 2.2 requires `Objects.requireNonNull(x, "x")` at public entry
+points. A null argument is a programming error, and `NullPointerException` is the
+conventional signal for that; `IllegalArgumentException` conventionally means the
+argument was of the right type but an unacceptable value.
+
+**Default.** Keep `NullPointerException` for nulls. If uniform
+`IllegalArgumentException` is wanted for all six validation failures, that is a
+one-line change per site.
+
+### Two `switch` statements remain, and they are on an enum
+
+Both are `MenuRouter#acknowledge`, switching on `Ack`:
+
+```java
+switch (ack) {
+    case DEFER_EDIT -> event.deferEdit().queue();
+    case DEFER_REPLY -> event.deferReply(true).queue();
+    case MODAL, NONE -> {}
+}
+```
+
+No string switch and no `.equals("` call remains anywhere in `core` or `view`;
+`grep '\.equals("'` returns nothing. Section 2.2 prefers pattern-matching
+`switch` for a closed set of types, and `Ack` is exactly that, so these two are
+the intended form rather than a leftover. The compiler enforces exhaustiveness,
+which is why adding an `Ack` constant cannot silently skip an acknowledgement.
+
 ### Hardcoded emoji that must move into presets
 
 Left in place by T1 because removing them changes rendered output:
