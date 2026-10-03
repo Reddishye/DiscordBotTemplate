@@ -24,16 +24,18 @@ import org.junit.jupiter.api.Test;
  * factories. The point is that the common mistake, pasting English directly into a
  * reply, fails the build instead of surviving to a translator.
  *
- * <p>Its limits are known and listed in NOTES.md:
+ * <p>{@link #EPHEMERAL_TEXT} closes the one gap that mattered: {@code Replies.ephemeral}
+ * takes the event first and the text second, and that method is the reply path every
+ * user-facing message in this package travels, so a rule that only looked at the first
+ * argument had no coverage of the reply path at all.
+ *
+ * <p>The remaining limits are known and are also listed in NOTES.md:
  *
  * <ul>
  *   <li>A literal that starts with markdown or an emoji, such as {@code "*Not set*"},
  *       is not matched, because the leading character is not a letter.
  *   <li>A literal passed through a constant or a local variable is not matched, only a
- *       literal in argument position. In particular {@code Replies.ephemeral} takes the
- *       event first, so a literal second argument is missed, and that is the reply path
- *       every user-facing message in this package travels. Asserted by
- *       {@link #knownGapIsReal()} so the gap cannot be quietly forgotten.
+ *       literal in argument position.
  *   <li>A literal built by concatenation, or by {@code formatted}, is not matched.
  * </ul>
  *
@@ -46,10 +48,23 @@ class NoHardcodedUserTextTest {
 
     private static final Path MENU_ROOT = Path.of("src/main/java/es/redactado/menu");
 
+    private static final String TEXT_CALLS =
+            "\\b(?:ephemeral|sendMessage|reply|setContent|TextDisplay\\.of|Section\\.of"
+                    + "|Button\\.(?:primary|secondary|success|danger|of))";
+
     private static final Pattern HARDCODED =
-            Pattern.compile(
-                    "\\b(?:ephemeral|sendMessage|reply|setContent|TextDisplay\\.of|Section\\.of"
-                        + "|Button\\.(?:primary|secondary|success|danger|of))\\s*\\(\\s*\"([A-Za-z][^\"]*)\"");
+            Pattern.compile(TEXT_CALLS + "\\s*\\(\\s*\"([A-Za-z][^\"]*)\"");
+
+    /**
+     * The text of {@code Replies.ephemeral}, which is the second argument because the
+     * event comes first.
+     *
+     * <p>Scoped to this one method on purpose. Matching any second argument would also
+     * match format strings, builder arguments and developer-facing text, and the scan
+     * would start reporting things that are correct.
+     */
+    private static final Pattern EPHEMERAL_TEXT =
+            Pattern.compile("\\bReplies\\.ephemeral\\s*\\([^,]+,\\s*\"([A-Za-z][^\"]*)\"");
 
     @Test
     @DisplayName("no English literal is passed straight to a user-facing call")
@@ -64,8 +79,7 @@ class NoHardcodedUserTextTest {
                     files.filter(path -> path.toString().endsWith(".java")).sorted().toList()) {
                 scanned++;
                 for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
-                    var matcher = HARDCODED.matcher(line);
-                    while (matcher.find()) {
+                    if (HARDCODED.matcher(line).find() || EPHEMERAL_TEXT.matcher(line).find()) {
                         offenders.add(file + ": " + line.strip());
                     }
                 }
@@ -95,16 +109,34 @@ class NoHardcodedUserTextTest {
     }
 
     @Test
-    @DisplayName("a literal behind the event argument is a known gap, asserted not assumed")
-    void knownGapIsReal() {
-        // Replies.ephemeral takes the event first, so a literal second argument is not in
-        // the position this scan inspects. Every user-facing reply in the menu package
-        // travels through that method, so this gap covers the most important call site
-        // there is. It is recorded rather than closed: widening the rule to any argument
-        // position would also flag format strings and developer-facing text, and the scan
-        // would become noise nobody keeps enabled.
+    @DisplayName("a literal behind the event argument is caught by its own rule")
+    void ephemeralTextIsFlagged() {
+        // The rule that used to be a gap. Replies.ephemeral is the reply path every
+        // user-facing message in the menu package travels, so a literal here is the most
+        // consequential mistake available.
         assertThat(linesFlagged("Replies.ephemeral(event, \"This menu is not yours.\");"))
+                .hasSize(1);
+        assertThat(linesFlagged("Replies.ephemeral(event, message);")).isEmpty();
+        assertThat(
+                        linesFlagged(
+                                "Replies.ephemeral(event, messages, locale,"
+                                        + " MessageKeys.ERROR_BUSY);"))
                 .isEmpty();
+        assertThat(linesFlagged("Replies.ephemeral(event, \"*Not set*\");"))
+                .as("still a gap: a literal starting with markdown is not matched")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("the ephemeral rule is scoped to that one method, not to every second argument")
+    void ephemeralRuleIsNarrow() {
+        // Guards against the rule being widened later into something that matches format
+        // strings and developer-facing text.
+        // First arguments here are identifiers, so only an over-wide second-argument
+        // rule could match them.
+        assertThat(linesFlagged("event.reply(action, \"second\");")).isEmpty();
+        assertThat(linesFlagged("builder.setTitle(a, \"b\");")).isEmpty();
+        assertThat(linesFlagged("TextDisplay.of(component, \"text\");")).isEmpty();
     }
 
     @Test
@@ -131,7 +163,7 @@ class NoHardcodedUserTextTest {
     private static List<String> linesFlagged(String... lines) {
         List<String> flagged = new ArrayList<>();
         for (String line : lines) {
-            if (HARDCODED.matcher(line).find()) {
+            if (HARDCODED.matcher(line).find() || EPHEMERAL_TEXT.matcher(line).find()) {
                 flagged.add(line);
             }
         }

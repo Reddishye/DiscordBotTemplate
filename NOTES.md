@@ -856,22 +856,29 @@ UTF-8. Reading it as ISO-8859-1 would yield different code points and the equali
 would fail. Writing the literals as accented characters in the test source would have
 made the test assert that a file is identical to itself.
 
-### The literal scan cannot see the main reply path, and that is recorded in a test
+### The literal scan covers the reply path through one targeted rule
 
 `NoHardcodedUserTextTest` flags an English literal in the first argument position of
-`ephemeral(`, `reply(`, `TextDisplay.of(` and friends. `Replies.ephemeral` takes the
-event first and the text second, so a literal there is not in the position the scan
-inspects, and **every** user-facing reply in the package travels through that method.
+`ephemeral(`, `reply(`, `TextDisplay.of(` and friends. That missed
+`Replies.ephemeral(event, "text")`, where the event is first and the text second, and
+that method is the reply path **every** user-facing message in the package travels, so
+the first-argument rule had no coverage of it at all.
 
-Rather than widen the rule to any argument position, which would also flag format strings
-and developer-facing text and turn the scan into noise, the gap is asserted by
-`knownGapIsReal()` and documented in the test's Javadoc. A known gap that a test pins
-down is recoverable; one that is quietly forgotten is not.
+A second pattern now covers that one method. It is scoped to `Replies.ephemeral` rather
+than to "any second argument", because matching any second argument would also match
+format strings, builder arguments and developer-facing text, and the scan would start
+reporting things that are correct. `ephemeralRuleIsNarrow` pins that down so a later
+widening fails the build.
 
-Two more blind spots, listed in that Javadoc: a literal starting with markdown or an emoji
-(`"*Not set*"`) is not matched because the first character is not a letter, and a literal
-arriving through a constant or a local variable is not in argument position at all. All
-three occurred during T9 and were localized anyway.
+Remaining gaps, all asserted rather than assumed:
+
+- A literal starting with markdown or an emoji, `TextDisplay.of("*Not set*")`, is not
+  matched because the first character is not a letter.
+- A literal arriving through a constant or a local variable is not in argument position.
+- A literal built by concatenation or `formatted` is not matched.
+
+All three occurred during T9 and were localized anyway. The scan is a net for new
+mistakes, not a substitute for reading the diff.
 
 ### Developer-facing text was deliberately not translated
 
