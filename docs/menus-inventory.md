@@ -303,9 +303,13 @@ is the final path; the "Name" column is the final type name where it differs.
 
 ### 3.2 Not ported
 
-- `ProfileMenu.java` (367 lines). Ported only as `examples/ProfileExampleMenu`
-  backed by an in-memory fake service, per section 1.
-- `repomix-output.xml`. Generated dump.
+`ProfileMenu.java` (367 lines) is the only SOURCE menu class that was not ported,
+and it never becomes production code. Per section 1 of the plan it is ported only
+in T12 as `examples/ProfileExampleMenu`, backed by an in-memory fake service, to
+demonstrate the framework. Its bot-specific logic is not copied: neither the
+`ApplyService` dependency nor the `es.redactado.database.type.LinkType` reference.
+
+`repomix-output.xml` is a generated dump and is not code.
 
 ### 3.3 Source behaviour to correct during the port
 

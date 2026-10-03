@@ -179,9 +179,10 @@ Mapping chosen:
 ## Source items ported but expected to be replaced later
 
 An earlier revision of this file listed these as "not ported". The maintainer
-overruled that for T1: **every SOURCE class except `ProfileMenu` is ported first**,
-and removals happen in later tasks where the surrounding design is being rewritten.
-All 28 files are in the tree as of commit `rename types that clash with jda`.
+overruled that for T1: all 28 SOURCE framework classes were ported first, and
+removals happen in later tasks where the surrounding design is being rewritten.
+`ProfileMenu` is the only SOURCE class that was **not** ported in T1, and it is
+**not** production code. See the entry below.
 
 | Class | Why ported anyway | Due |
 | --- | --- | --- |
@@ -190,11 +191,20 @@ All 28 files are in the tree as of commit `rename types that clash with jda`.
 | `api/StateNotFoundException` | used by `MenuContext#require` | T5, replaced by `UserFacingException` |
 | `view/SectionList` | keeps its page in per-event state and emits an unhandled `"noop"` custom id | T10, replaced by `Pager<T>` |
 | `view/JdaSeparator` | static factory returning a raw JDA component, not a `MenuComponent` | T10, folded into `Divider` |
-| `view/ThumbnailComponent` | guaranteed `ClassCastException`, see above | T10 |
+| `view/ThumbnailComponent` | guaranteed `ClassCastException`, see above | fixed in T1b, folded into `Section` in T10 |
 | `core/AbstractMenu` | carries the `onButton` string comparison and the modal helper | T4, replaced by the dispatcher |
 
-`ProfileMenu.java` is still excluded from production code, per section 1. It is
-ported only later as `examples/ProfileExampleMenu` on an in-memory fake service.
+### `ProfileMenu` is not production code
+
+`ProfileMenu.java` is the only SOURCE menu class that was not ported, and it will
+not become production code at any point. Per section 1 of the plan it is ported
+only in **T12**, as `examples/ProfileExampleMenu`, backed by an in-memory fake
+service, to demonstrate the framework. Its bot-specific logic, in particular the
+`ApplyService` dependency and the `es.redactado.database.type.LinkType`
+reference, is not copied into the template.
+
+Nothing under `es.redactado.menu.examples` is production code. Those classes are
+compiled and tested but never registered by default.
 
 ## Rename verification (T1 commit 2)
 
