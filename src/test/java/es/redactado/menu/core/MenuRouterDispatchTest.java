@@ -18,6 +18,7 @@ import es.redactado.menu.api.ButtonHandler;
 import es.redactado.menu.api.Done;
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
+import es.redactado.menu.api.Render;
 import es.redactado.menu.api.UserFacingException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -63,8 +64,8 @@ class MenuRouterDispatchTest {
         }
 
         @Override
-        public Container render(MenuContext ctx) {
-            return Container.of(TextDisplay.of("body"));
+        public CompletableFuture<Container> render(MenuContext ctx) {
+            return Render.now(Container.of(TextDisplay.of("body")));
         }
 
         @Override

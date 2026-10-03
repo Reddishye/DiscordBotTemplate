@@ -721,6 +721,52 @@ guard that fails fast at the point of construction; `ViewEditor` is the boundary
 check that protects Discord for any container that bypasses the builder. Both
 messages are the same generic one, so neither leaks internals.
 
+### `Menu.render` returning a future forced three more `api` types
+
+`Loader`, `Renderer`, and `Render` are all in `api` by design: `AbstractMenu#view`
+is `protected`, so a menu subclass in any package can use them, and putting them in
+`core` would make every menu depend on the dispatcher. `Loader` and `Renderer` are
+`@FunctionalInterface` so a menu can write a view inline.
+
+### `refresh` returns a future instead of being fire-and-forget
+
+The first version of `AbstractMenu#refresh` chained the render and then called
+`.join()`, which would have been a forbidden blocking call caught by
+`NoBlockingCallsTest`. `refresh` now returns `CompletableFuture<Void>` and the
+handler decides what to do with a failure. A handler that ignores the returned
+future still works; nothing blocks either way.
+
+### `MenuExecutor.supply` is the bridge to the blocking template
+
+The template's `AbstractRepository` is synchronous JPA
+(`session.createQuery(...).list()`, `session.beginTransaction()`) with no async
+handle exposed. Documented in `docs/menus-inventory.md` section 1.7b so the wiring
+task can choose deliberately rather than discovering it.
+
+The Javadoc on `supply` states the important consequence: virtual threads remove the
+platform-thread bottleneck, not the resource one. A HikariCP pool of ten admits ten
+concurrent queries whatever the executor does, so pool sizing is the real decision.
+
+### `DataCache.invalidateAfter` invalidates on failure too
+
+Invalidating only on success would leave a stale entry after a failed write, which
+may still have changed the stored row. The test covers both directions and asserts
+the original result or exception is preserved either way.
+
+### Three test-design mistakes worth recording
+
+Each of these was a test bug, not a production bug, and each is the kind that makes
+an async suite flaky rather than failing loudly:
+
+- Asserting a `supply`/`run` result without first waiting on the future. The
+  executor is asynchronous by design, so `marker.get()` right after
+  `executor.run(...)` is a race.
+- Reading a session through a cache that had just renewed it and then expecting
+  expiry, which cannot happen because the read reset the clock.
+- A "PUSH" expectation that included the *current* view in the render list. `PUSH`
+  records the current view and renders only the target; the current view is never
+  re-rendered on the way out.
+
 ### Hardcoded emoji that must move into presets
 
 Left in place by T1 because removing them changes rendered output:

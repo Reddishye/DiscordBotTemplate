@@ -20,6 +20,7 @@ import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.MenuNotFoundException;
 import es.redactado.menu.api.ModalHandler;
+import es.redactado.menu.api.Render;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import net.dv8tion.jda.api.components.container.Container;
@@ -60,8 +61,8 @@ class MenuRouterTest {
         }
 
         @Override
-        public Container render(MenuContext ctx) {
-            return Container.of(TextDisplay.of("body"));
+        public CompletableFuture<Container> render(MenuContext ctx) {
+            return Render.now(Container.of(TextDisplay.of("body")));
         }
 
         @Override

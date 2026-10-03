@@ -11,7 +11,9 @@ import es.redactado.menu.api.ActionTable;
 import es.redactado.menu.api.Done;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.NavigationMode;
+import es.redactado.menu.api.Render;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
@@ -34,8 +36,8 @@ class AbstractMenuTest {
         protected void declare(ActionTable.Builder table) {}
 
         @Override
-        protected Container build(MenuContext ctx) {
-            return Container.of(TextDisplay.of("body"));
+        public CompletableFuture<Container> render(MenuContext ctx) {
+            return Render.now(Container.of(TextDisplay.of("body")));
         }
     }
 
@@ -51,8 +53,8 @@ class AbstractMenuTest {
         }
 
         @Override
-        protected Container build(MenuContext ctx) {
-            return Container.of(TextDisplay.of("body"));
+        public CompletableFuture<Container> render(MenuContext ctx) {
+            return Render.now(Container.of(TextDisplay.of("body")));
         }
     }
 

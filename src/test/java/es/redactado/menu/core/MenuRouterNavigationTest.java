@@ -14,7 +14,9 @@ import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.NavEntry;
 import es.redactado.menu.api.NavigationMode;
+import es.redactado.menu.api.Render;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
@@ -56,8 +58,8 @@ class MenuRouterNavigationTest {
                         }
 
                         @Override
-                        protected Container build(MenuContext ctx) {
-                            return Container.of(TextDisplay.of("a:" + ctx.action()));
+                        public CompletableFuture<Container> render(MenuContext ctx) {
+                            return Render.now(Container.of(TextDisplay.of("a:" + ctx.action())));
                         }
                     });
             router.register("b", target);
@@ -101,8 +103,8 @@ class MenuRouterNavigationTest {
                         }
 
                         @Override
-                        protected Container build(MenuContext ctx) {
-                            return Container.of(TextDisplay.of("a"));
+                        public CompletableFuture<Container> render(MenuContext ctx) {
+                            return Render.now(Container.of(TextDisplay.of("a")));
                         }
                     });
             router.register("b", target);
@@ -133,7 +135,9 @@ class MenuRouterNavigationTest {
                 .thenAnswer(
                         invocation -> {
                             MenuContext ctx = invocation.getArgument(0);
-                            return Container.of(TextDisplay.of(ctx.menuId() + ":" + ctx.action()));
+                            return Render.now(
+                                    Container.of(
+                                            TextDisplay.of(ctx.menuId() + ":" + ctx.action())));
                         });
         return menu;
     }

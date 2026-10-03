@@ -8,6 +8,7 @@ import es.redactado.menu.api.ButtonHandler;
 import es.redactado.menu.api.Done;
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
+import es.redactado.menu.api.Render;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -52,8 +53,8 @@ class MenuRouterThroughputTest {
         }
 
         @Override
-        public Container render(MenuContext ctx) {
-            return Container.of(TextDisplay.of("body"));
+        public CompletableFuture<Container> render(MenuContext ctx) {
+            return Render.now(Container.of(TextDisplay.of("body")));
         }
 
         @Override

@@ -177,6 +177,31 @@ src/main/java/es/redactado/menu/
   Accessory.java                 Section accessories: buttons and thumbnails
 ```
 
+### 1.7b How the template's own services are called today
+
+Relevant to the wiring task: menu data will come from these, and the choice
+between `MenuExecutor.supply` and a native async API depends on the answer.
+
+**Everything is blocking. There is no async or reactive API in the template
+outside the menu package.** Specifically:
+
+| Component | Shape | Consequence for menus |
+| --- | --- | --- |
+| `AbstractRepository` | synchronous JPA: `session.createQuery(...).list()`, `session.beginTransaction()` | must be called through `MenuExecutor.supply`, not directly from a handler |
+| `DatabaseManager` | `SessionFactory`, built eagerly by Guice | startup only; not on the interaction path |
+| `TaskManager` | `CompletableFuture` over a scheduled pool | usable directly, but it is a general scheduler, not a data source |
+| `CommandListener` | `CompletableFuture.runAsync` on a virtual-thread executor | the pattern the menu system generalises |
+| JDA REST | `RestAction.submit()` | already asynchronous; compose rather than wrap |
+
+Hibernate offers an `unwrap(Session.class, CompletionStage.class)` style handle for
+asynchronous completion, but nothing in this template uses it and no repository
+exposes it. So the wiring task should assume **blocking repositories** and reach
+them through `MenuExecutor.supply`, which keeps the JDA thread free and bounds the
+real concurrency at the HikariCP pool.
+
+The two `CompletableFuture` users above are `TaskManager` (scheduling, not data)
+and `CommandListener` (dispatch), neither of which provides an async repository.
+
 ### 1.8 Test infrastructure
 
 `tasks.test` uses `useJUnitPlatform()`. Two JVM settings are required, both

@@ -1,9 +1,12 @@
 package es.redactado.menu.core;
 
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +62,58 @@ public final class MenuExecutor implements AutoCloseable {
      */
     public void execute(Runnable task) {
         delegate.execute(task);
+    }
+
+    /**
+     * Runs a task that produces a value, on a virtual thread.
+     *
+     * <p>This is the sanctioned bridge to a blocking service such as JDBC or a
+     * synchronous HTTP client. Menu code must never call one directly from a
+     * handler, because a handler may run on a JDA event thread in the same task
+     * that has to answer the interaction.
+     *
+     * <p>Virtual threads remove the platform-thread bottleneck but not the resource
+     * one: a HikariCP pool of ten connections still admits ten concurrent
+     * queries, and the rest queue. That pool, not this executor, is what actually
+     * limits concurrency, so sizing the pool is the meaningful decision.
+     *
+     * @param task the work to run; may block
+     * @param <T> the produced type
+     * @return a future completing with the value, or completing exceptionally if
+     *     the task threw
+     */
+    public <T> CompletableFuture<T> supply(Supplier<T> task) {
+        Objects.requireNonNull(task, "task");
+        CompletableFuture<T> result = new CompletableFuture<>();
+        try {
+            execute(
+                    () -> {
+                        try {
+                            result.complete(task.get());
+                        } catch (Throwable error) {
+                            result.completeExceptionally(error);
+                        }
+                    });
+        } catch (RejectedExecutionException e) {
+            result.completeExceptionally(e);
+        }
+        return result;
+    }
+
+    /**
+     * Runs a task that produces nothing, on a virtual thread.
+     *
+     * @param task the work to run; may block
+     * @return a future completing when the task does, or completing exceptionally
+     *     if it threw
+     */
+    public CompletableFuture<Void> run(Runnable task) {
+        Objects.requireNonNull(task, "task");
+        return supply(
+                () -> {
+                    task.run();
+                    return null;
+                });
     }
 
     /**

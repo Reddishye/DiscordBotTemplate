@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-import net.dv8tion.jda.api.components.container.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,37 +42,31 @@ final class Navigator {
      * @throws UserFacingException if the target menu is not registered
      */
     CompletableFuture<Void> go(MenuContext ctx, NavigationMode mode, String targetMenuId) {
-        switch (mode) {
+        return switch (mode) {
             case PUSH -> {
                 ctx.session().push(currentEntry(ctx));
-                show(ctx, homeOf(ctx, targetMenuId));
+                yield show(ctx, homeOf(ctx, targetMenuId));
             }
             case REPLACE -> show(ctx, homeOf(ctx, targetMenuId));
             case ROOT -> {
                 findSession(ctx).ifPresent(Session::clearStack);
-                show(ctx, homeOf(ctx, targetMenuId));
+                yield show(ctx, homeOf(ctx, targetMenuId));
             }
             case BACK -> back(ctx);
-        }
-        return CompletableFuture.completedFuture(null);
+        };
     }
 
-    private void back(MenuContext ctx) {
+    private CompletableFuture<Void> back(MenuContext ctx) {
         Optional<Session> existing = findSession(ctx);
         if (existing.isEmpty()) {
             // The session expired, so there is no history to honour. Say so rather
             // than pretending the user never navigated, then land them somewhere
             // usable.
             Replies.ephemeral(ctx.event(), EXPIRED);
-            show(ctx, currentHome(ctx));
-            return;
+            return show(ctx, currentHome(ctx));
         }
         Optional<NavEntry> previous = existing.get().pop();
-        if (previous.isEmpty()) {
-            show(ctx, currentHome(ctx));
-            return;
-        }
-        show(ctx, previous.get());
+        return show(ctx, previous.orElseGet(() -> currentHome(ctx)));
     }
 
     private Optional<Session> findSession(MenuContext ctx) {
@@ -104,9 +97,19 @@ final class Navigator {
         }
     }
 
-    private void show(MenuContext ctx, NavEntry entry) {
+    /**
+     * Renders a remembered view and sends it.
+     *
+     * <p>The edit happens only once the render future completes, so a view that
+     * loads data asynchronously never leaves the message showing stale content. A
+     * failed render propagates to whoever is handling the interaction rather than
+     * being swallowed here.
+     *
+     * @return a future completing when the edit is sent
+     */
+    private CompletableFuture<Void> show(MenuContext ctx, NavEntry entry) {
         Menu menu = lookupMenu(entry.menuId());
-        Container container = menu.render(ctx.at(entry));
-        ViewEditor.edit(ctx.event().getHook(), container);
+        return menu.render(ctx.at(entry))
+                .thenCompose(container -> ViewEditor.edit(ctx.event().getHook(), container));
     }
 }

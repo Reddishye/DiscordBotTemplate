@@ -1,6 +1,7 @@
 package es.redactado.menu.api;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.components.container.Container;
 
 /**
@@ -17,12 +18,16 @@ public interface Menu {
     String id();
 
     /**
-     * Builds the JDA container for the current context.
+     * Produces the container for the current context.
+     *
+     * <p>Returning a future is what keeps I/O out of rendering: a menu loads its
+     * data through a {@link Loader} and hands the model to a {@link Renderer}, so
+     * the render itself stays a pure function and never blocks.
      *
      * @param ctx the context of the current interaction
-     * @return the rendered container
+     * @return a future for the rendered container; never {@code null}
      */
-    Container render(MenuContext ctx);
+    CompletableFuture<Container> render(MenuContext ctx);
 
     /**
      * The view this menu shows when it is opened or navigated to without history.

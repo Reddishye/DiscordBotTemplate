@@ -115,11 +115,24 @@ public final class MenuRouter implements AutoCloseable {
      *
      * @param menuId the menu id
      * @param ctx the context of the current interaction
-     * @return the rendered container
+     * @return a future for the rendered container
      * @throws MenuNotFoundException if no menu is registered under that id
      */
-    public Container render(String menuId, MenuContext ctx) {
+    public CompletableFuture<Container> render(String menuId, MenuContext ctx) {
         return get(menuId).render(ctx);
+    }
+
+    /**
+     * The executor that runs handler bodies.
+     *
+     * <p>Exposed so a menu can be constructed with it and use
+     * {@link MenuExecutor#supply(java.util.function.Supplier)} to call a blocking
+     * service without touching a JDA thread.
+     *
+     * @return this router's executor
+     */
+    public MenuExecutor executor() {
+        return executor;
     }
 
     /**

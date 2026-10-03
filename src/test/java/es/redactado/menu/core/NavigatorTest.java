@@ -14,6 +14,7 @@ import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.MenuNotFoundException;
 import es.redactado.menu.api.NavEntry;
 import es.redactado.menu.api.NavigationMode;
+import es.redactado.menu.api.Render;
 import es.redactado.menu.api.Session;
 import es.redactado.menu.api.UserFacingException;
 import java.util.List;
@@ -78,8 +79,9 @@ class NavigatorTest {
                 .thenAnswer(
                         invocation -> {
                             MenuContext ctx = invocation.getArgument(0);
-                            rendered.add(ctx.menuId() + ":" + ctx.action());
-                            return container(ctx.menuId() + ":" + ctx.action());
+                            String label = ctx.menuId() + ":" + ctx.action();
+                            rendered.add(label);
+                            return Render.now(container(label));
                         });
         return menu;
     }
