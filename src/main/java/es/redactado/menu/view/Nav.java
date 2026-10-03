@@ -89,6 +89,20 @@ public final class Nav implements RowItem {
     }
 
     /**
+     * Replaces the button's text.
+     *
+     * <p>For the navigation buttons that are not going back, the label is already the
+     * caller's. This is for {@link #back()} when the caller needs a different word, such
+     * as "cancel" on a confirmation.
+     *
+     * @param label the text, already localized
+     * @return a copy of this button
+     */
+    public Nav label(String label) {
+        return new Nav(mode, targetMenuId, label, icon);
+    }
+
+    /**
      * Shows a semantic icon, resolved from the preset.
      *
      * @param icon the meaning

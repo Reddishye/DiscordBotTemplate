@@ -42,4 +42,8 @@ public final class MessageKeys {
     // menu.pager: labels for the page arrows when the preset defines no icon for them
     public static final String PAGER_PREVIOUS = "menu.pager.previous";
     public static final String PAGER_NEXT = "menu.pager.next";
+
+    // menu.confirm: the two answers on a confirmation row
+    public static final String CONFIRM_YES = "menu.confirm.yes";
+    public static final String CONFIRM_NO = "menu.confirm.no";
 }
