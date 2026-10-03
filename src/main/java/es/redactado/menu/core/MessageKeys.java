@@ -33,6 +33,7 @@ public final class MessageKeys {
 
     // menu.nav: navigation and session lifetime
     public static final String NAV_EXPIRED = "menu.nav.expired";
+    public static final String NAV_BACK = "menu.nav.back";
 
     // menu.field and menu.list: default view text
     public static final String FIELD_NOT_SET = "menu.field.not_set";

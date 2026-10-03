@@ -3,14 +3,11 @@ package es.redactado.menu.view;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.ValidationResult;
 import es.redactado.menu.api.Validator;
 import es.redactado.menu.preset.BuiltinPresets;
-import es.redactado.menu.preset.Preset;
 import java.util.List;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -20,7 +17,6 @@ import net.dv8tion.jda.api.components.section.Section;
 import net.dv8tion.jda.api.components.section.SectionAccessoryComponent;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.components.thumbnail.Thumbnail;
-import net.dv8tion.jda.api.entities.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -208,22 +204,12 @@ class MenuBuilderTest {
     /**
      * A context carrying the default preset.
      *
-     * <p>{@code build} now reads the preset for the container colour and the footer, and
-     * the user for the footer's {@code {user}}, so a bare mock with only an id would
-     * render nothing. Every view test needs the same three stubs, so they live here.
+     * <p>Delegated to the shared helper so every view test resolves text the same way;
+     * only the menu id is local, since it differs per test.
      */
-    private MenuContext context(String menuId) {
-        return context(menuId, BuiltinPresets.DEFAULT);
-    }
-
-    /** A context rendering with a chosen preset. */
-    static MenuContext context(String menuId, Preset preset) {
-        MenuContext ctx = mock(MenuContext.class);
-        User user = mock(User.class);
-        when(user.getEffectiveName()).thenReturn("Ada");
-        when(ctx.menuId()).thenReturn(menuId);
-        when(ctx.preset()).thenReturn(preset);
-        when(ctx.discordUser()).thenReturn(user);
+    private static MenuContext context(String menuId) {
+        MenuContext ctx = ViewContexts.forPreset(BuiltinPresets.DEFAULT);
+        org.mockito.Mockito.when(ctx.menuId()).thenReturn(menuId);
         return ctx;
     }
 }
