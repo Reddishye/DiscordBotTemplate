@@ -1,12 +1,17 @@
 package es.redactado.menu.view;
 
-import es.redactado.menu.api.MenuComponent;
 import es.redactado.menu.api.MenuContext;
-import java.util.List;
-import net.dv8tion.jda.api.components.container.ContainerChildComponent;
+import net.dv8tion.jda.api.components.actionrow.ActionRowChildComponent;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.buttons.ButtonStyle;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 
-public class LinkButton implements MenuComponent {
+/**
+ * A button that opens a URL and therefore routes nowhere. Place it in a
+ * {@link Row}.
+ */
+public final class LinkButton implements RowItem {
+
     private final String url;
     private final String label;
     private final Emoji emoji;
@@ -17,21 +22,29 @@ public class LinkButton implements MenuComponent {
         this.emoji = emoji;
     }
 
+    /**
+     * Creates a link button.
+     *
+     * @param url the target URL
+     * @param label the button text
+     * @return the button
+     */
     public static LinkButton of(String url, String label) {
         return new LinkButton(url, label, null);
     }
 
-    public LinkButton emoji(Emoji e) {
-        return new LinkButton(url, label, e);
+    /**
+     * Returns a copy carrying the given emoji.
+     *
+     * @param emoji the emoji to show on the button
+     * @return a new button
+     */
+    public LinkButton emoji(Emoji emoji) {
+        return new LinkButton(url, label, emoji);
     }
 
     @Override
-    public List<ContainerChildComponent> render(MenuContext ctx) {
-        var btn =
-                label != null
-                        ? net.dv8tion.jda.api.components.buttons.Button.link(url, label)
-                        : net.dv8tion.jda.api.components.buttons.Button.link(url, "");
-        if (emoji != null) btn = btn.withEmoji(emoji);
-        return List.of((ContainerChildComponent) btn);
+    public ActionRowChildComponent render(MenuContext ctx) {
+        return Button.of(ButtonStyle.LINK, url, label, emoji);
     }
 }

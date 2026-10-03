@@ -140,6 +140,8 @@ src/main/java/es/redactado/menu/
   api/                            Menu, MenuContext, MenuComponent, exceptions
   core/                           MenuRouter, ComponentId, navigation, base classes
   view/                           MenuBuilder, components, Limits, Validator
+  RowItem.java                   Action-row children: buttons and selects
+  Accessory.java                 Section accessories: buttons and thumbnails
 ```
 
 ### 1.8 Test infrastructure
@@ -354,9 +356,16 @@ Carried over from the source, and each one contradicts a rule of the plan:
 - `ActionButton#render`, `LinkButton#render`, and `ThumbnailComponent#render`
   cast a JDA `Button` or `Thumbnail` to `ContainerChildComponent`. Those JDA
   types extend `ActionRowChildComponent` and `SectionAccessoryComponent`, and
-  the hierarchies are disjoint, so every call throws `ClassCastException`. The
+  the hierarchies are disjoint, so every call threw `ClassCastException`. The
   source bot never hit this because `ProfileMenu` builds JDA components directly
-  and never instantiates these three classes. Detailed in `NOTES.md`.
+  and never instantiates these three classes. **Fixed in T1b** by splitting the
+  render contract into `MenuComponent`, `RowItem`, and `Accessory`. Detailed in
+  `NOTES.md`.
+- `ActionButton#render` called `Button.of(style, id, emoji)` when the label was
+  empty, but that overload requires a non-null emoji. Removing the `"⬜"`
+  placeholder turned a cosmetic default into a `NullPointerException`. **Fixed
+  in T1b** by using the four-argument `Button.of`, which accepts a nullable
+  label and emoji and lets JDA enforce the "label or emoji" rule.
 
 ### 3.4 Source constants reused verbatim
 

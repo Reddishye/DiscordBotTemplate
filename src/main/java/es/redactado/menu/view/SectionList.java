@@ -18,6 +18,9 @@ import net.dv8tion.jda.api.entities.emoji.Emoji;
  */
 public class SectionList<T> implements MenuComponent {
 
+    private static final String PAGE_ACTION = "sectionlist_page";
+    private static final String NO_ACTION = "noop";
+
     @FunctionalInterface
     public interface ItemRenderer<T> {
         Section render(T item, MenuContext ctx);
@@ -58,36 +61,29 @@ public class SectionList<T> implements MenuComponent {
         }
 
         if (totalPages > 1) {
-            String pageText = "%d/%d".formatted(page + 1, totalPages);
-            var navBtns = new ArrayList<Button>();
-            if (page > 0) {
-                navBtns.add(
-                        Button.of(
-                                ButtonStyle.SECONDARY,
-                                ComponentId.encode(
-                                        ctx.menuId(),
-                                        "sectionlist_page",
-                                        stateKey,
-                                        String.valueOf(page - 1)),
-                                Emoji.fromUnicode("◀")));
-            }
-            navBtns.add(Button.of(ButtonStyle.SECONDARY, "noop", pageText));
-            if (page < totalPages - 1) {
-                navBtns.add(
-                        Button.of(
-                                ButtonStyle.SECONDARY,
-                                ComponentId.encode(
-                                        ctx.menuId(),
-                                        "sectionlist_page",
-                                        stateKey,
-                                        String.valueOf(page + 1)),
-                                Emoji.fromUnicode("▶")));
-            }
-            result.add(
-                    (ContainerChildComponent)
-                            net.dv8tion.jda.api.components.actionrow.ActionRow.of(navBtns));
+            result.addAll(Row.of(navigation(page, totalPages)).render(ctx));
         }
 
         return result;
+    }
+
+    private RowItem[] navigation(int page, int totalPages) {
+        String pageText = "%d/%d".formatted(page + 1, totalPages);
+        List<RowItem> nav = new ArrayList<>();
+        if (page > 0) {
+            nav.add(c -> pageButton(c, page - 1, "◀"));
+        }
+        nav.add(c -> Button.of(ButtonStyle.SECONDARY, NO_ACTION, pageText));
+        if (page < totalPages - 1) {
+            nav.add(c -> pageButton(c, page + 1, "▶"));
+        }
+        return nav.toArray(new RowItem[0]);
+    }
+
+    private Button pageButton(MenuContext ctx, int targetPage, String arrow) {
+        return Button.of(
+                ButtonStyle.SECONDARY,
+                ComponentId.encode(ctx.menuId(), PAGE_ACTION, stateKey, String.valueOf(targetPage)),
+                Emoji.fromUnicode(arrow));
     }
 }

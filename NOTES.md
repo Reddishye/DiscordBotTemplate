@@ -260,9 +260,9 @@ the defect T5 removes.
 ### `ActionButton`, `LinkButton`, and `ThumbnailComponent` always throw
 
 Discovered by the T1 smoke test, not present in the known-defects list.
+**Fixed in T1b.**
 
-`MenuComponent#render` is declared as returning
-`List<ContainerChildComponent>`, but JDA's component hierarchies are disjoint:
+JDA splits components across three disjoint hierarchies:
 
 ```
 Button     extends ActionComponent, ActionRowChildComponent, SectionAccessoryComponent
@@ -272,14 +272,14 @@ ActionRowChildComponent  extends Component
 SectionAccessoryComponent extends Component
 ```
 
-`Button` and `Thumbnail` are **not** `ContainerChildComponent`. All three
-classes therefore end their render with a cast that can never succeed:
+`Button` and `Thumbnail` are **not** `ContainerChildComponent`, yet all three
+classes ended their render with a cast that could never succeed:
 
-- `ActionButton#render` returns `List.of((ContainerChildComponent) btn)`
-- `LinkButton#render` returns `List.of((ContainerChildComponent) btn)`
-- `ThumbnailComponent#render` returns `List.of((ContainerChildComponent) Thumbnail.fromUrl(url))`
+- `ActionButton#render` returned `List.of((ContainerChildComponent) btn)`
+- `LinkButton#render` returned `List.of((ContainerChildComponent) btn)`
+- `ThumbnailComponent#render` returned `List.of((ContainerChildComponent) thumbnail)`
 
-Verified at runtime on JDA 6.4.2:
+Verified at runtime before the fix:
 
 ```
 java.lang.ClassCastException: class net.dv8tion.jda.internal.components.buttons.ButtonImpl
@@ -293,28 +293,66 @@ java.lang.ClassCastException: class net.dv8tion.jda.internal.components.thumbnai
 
 **Why SOURCE never noticed.** `ProfileMenu` builds JDA buttons, rows, and
 sections directly and only ever imports `Text`, `Field`, `Gallery`, and
-`JdaSeparator`. `ActionButton`, `LinkButton`, and `ThumbnailComponent` are
+`JdaSeparator`. `ActionButton`, `LinkButton`, and `ThumbnailComponent` were
 unreachable dead code in the source bot.
 
-**Decision.** Ported verbatim and left broken, because fixing it requires
-changing the `MenuComponent#render` signature, which T1 explicitly forbids
-("do not change behaviour, signatures, or logic"). The three classes are marked
-as broken in `MenuBuilderTest`'s Javadoc so nobody discovers it at runtime.
+**Fix chosen, by maintainer instruction.** One interface per JDA hierarchy
+instead of a wildcard return type. `MenuComponent#render` keeps returning
+`List<ContainerChildComponent>` unchanged.
 
-**Mandatory fix, due in T10** when the view layer is rewritten to be
-preset-aware. The contract has to change from
-`List<ContainerChildComponent>` to something that can carry both container
-children and row or accessory children, for example
-`List<? extends Component>`, with `MenuBuilder` narrowing to
-`ContainerChildComponent` and `Row` narrowing to `ActionRowChildComponent`.
-`Row#render` already casts its children to `ActionRowChildComponent`, so it is
-already written for that contract.
+| Type | Interface | Rendered JDA type |
+| --- | --- | --- |
+| `MenuComponent` | `es.redactado.menu.api` | `List<ContainerChildComponent>` |
+| `RowItem` | `es.redactado.menu.view` | `ActionRowChildComponent` |
+| `Accessory` | `es.redactado.menu.view` | `SectionAccessoryComponent` |
 
-**Question.** Should the three broken classes be deleted in T10 instead of
-fixed, given that `Row` with plain JDA buttons covers the same ground?
+`ActionButton` and `LinkButton` now implement `RowItem` and no longer implement
+`MenuComponent`. `ThumbnailComponent` implements `Accessory` and no longer
+implements `MenuComponent`. `Row.of(RowItem...)` is now the only way to place a
+button in a container, and it rejects an empty row and a row longer than
+`Limits.MAX_ACTION_ROW_CHILDREN`. No `(ContainerChildComponent)` cast remains
+anywhere in the menu package.
 
-**Default.** Fix them, because section 5.3 lists `ActionButton`, `LinkButton`,
-and `Section` as required components.
+A wildcard return type such as `List<? extends Component>` was explicitly
+rejected, because it would push the hierarchy decision onto every caller and
+reintroduce the same ambiguity one layer up.
+
+### Second bug fixed alongside: buttons with no emoji
+
+Removing the `"⬜"` placeholder in T1 exposed a second latent defect.
+`ActionButton#render` used `Button.of(style, id, emoji)` when the label was
+empty, but that overload declares `Emoji` as `@Nonnull`, so a label-less,
+emoji-less button threw `NullPointerException`.
+
+**Fix.** `ActionButton` and `LinkButton` now use the four-argument
+`Button.of(style, idOrUrl, label, emoji)`, which declares both the label and the
+emoji as `@Nullable` and delegates the "must have a label or an emoji" rule to
+JDA's own `ButtonImpl.checkValid()`. This also removes a manual label-length
+check, because JDA enforces `Button.LABEL_MAX_LENGTH`.
+
+### Consumers adapted to the new contracts
+
+- `Field` builds its accessory through an `Accessory` lambda and calls
+  `Section.of(accessory.render(ctx), text)`. Its public API is unchanged. The
+  `"noop"` fallback id is now the named constant `NO_ACTION`.
+- `SectionList` builds its pagination row with `Row.of(RowItem...)` instead of a
+  raw JDA `ActionRow` plus a cast. Its page indicator still uses the `"noop"`
+  id, which remains a dead custom id until T10 replaces this class with
+  `Pager<T>`. Already tracked below.
+
+**Question.** Should the `"noop"` ids in `Field` and `SectionList` become
+disabled buttons now, so they cannot be clicked?
+
+**Default.** No. Leaving them live keeps T1b limited to the render contract.
+Tracked for T10.
+
+**Question.** Should there be a `Section` view component that wraps an
+`Accessory` plus text, so callers do not have to call JDA's `Section.of`
+directly? Today only `Field` builds sections, and the tests call
+`Section.of(...)` themselves.
+
+**Default.** No new component in T1b, to avoid inventing T10's API. Added in
+T10 alongside `Divider`, where section 5.3 requires `Section` anyway.
 
 ### Hardcoded emoji that must move into presets
 

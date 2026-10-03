@@ -13,6 +13,9 @@ import net.dv8tion.jda.api.entities.emoji.Emoji;
 
 /** A labelled field with optional edit button. Renders Section(Button + TextDisplay). */
 public class Field implements MenuComponent {
+
+    private static final String NO_ACTION = "noop";
+
     private final String label;
     private final String value;
     private final String actionId;
@@ -47,16 +50,22 @@ public class Field implements MenuComponent {
 
     @Override
     public List<ContainerChildComponent> render(MenuContext ctx) {
-        Emoji e =
+        Emoji accessoryEmoji =
                 emoji != null
                         ? emoji
                         : Emoji.fromCustom("lucide_check", 1521846140775960626L, false);
-        String id = actionId != null ? ComponentId.encode(ctx.menuId(), actionId) : "noop";
-        var btn = Button.of(ButtonStyle.SECONDARY, id, e);
+        Accessory accessory =
+                c ->
+                        Button.of(
+                                ButtonStyle.SECONDARY,
+                                actionId != null
+                                        ? ComponentId.encode(c.menuId(), actionId)
+                                        : NO_ACTION,
+                                accessoryEmoji);
         return List.of(
-                (ContainerChildComponent)
-                        Section.of(
-                                btn, TextDisplay.of("**%s:** %s".formatted(label, safeValue()))));
+                Section.of(
+                        accessory.render(ctx),
+                        TextDisplay.of("**%s:** %s".formatted(label, safeValue()))));
     }
 
     private String safeValue() {
