@@ -7,6 +7,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import es.redactado.menu.api.MenuContext;
+import es.redactado.menu.api.ValidationResult;
+import es.redactado.menu.api.Validator;
 import java.util.List;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;

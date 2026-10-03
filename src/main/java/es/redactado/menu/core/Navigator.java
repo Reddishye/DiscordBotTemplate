@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import net.dv8tion.jda.api.components.container.Container;
-import net.dv8tion.jda.api.interactions.InteractionHook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,7 +107,6 @@ final class Navigator {
     private void show(MenuContext ctx, NavEntry entry) {
         Menu menu = lookupMenu(entry.menuId());
         Container container = menu.render(ctx.at(entry));
-        InteractionHook hook = ctx.event().getHook();
-        hook.editOriginalComponents(container).useComponentsV2().queue();
+        ViewEditor.edit(ctx.event().getHook(), container);
     }
 }

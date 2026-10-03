@@ -88,7 +88,7 @@ public abstract class AbstractMenu implements Menu {
      * @throws IllegalStateException if the interaction was not acknowledged
      */
     protected void refresh(MenuContext ctx) {
-        acknowledgedHook(ctx.event()).editOriginalComponents(render(ctx)).useComponentsV2().queue();
+        ViewEditor.edit(acknowledgedHook(ctx.event()), render(ctx));
     }
 
     /**

@@ -166,7 +166,8 @@ src/main/java/es/redactado/menu/
                                    ActionTable, ButtonAction, ModalAction,
                                    ButtonHandler, ModalHandler, Done, Limits,
                                    UserFacingException, NavEntry, Session,
-                                   NavigationMode, exceptions
+                                   NavigationMode, Validator,
+                                   ValidationResult, exceptions
   core/                           MenuRouter, MenuExecutor, InteractionGuard,
                                    SessionStore, SessionConfig, Navigator,
                                    ComponentId, Replies, ErrorReply,
@@ -332,8 +333,8 @@ is the final path; the "Name" column is the final type name where it differs.
 | `navigation/NavigationAction.java` | `core/NavigationAction.java` | `NavigationAction` | **T5** parses mode and target into `ctx.navigate` |
 | `navigation/NavigationMode.java` | `api/NavigationMode.java` | `NavigationMode` | **T5** moved to `api`, reduced to `PUSH`, `REPLACE`, `BACK`, `ROOT` |
 | `validation/Limits.java` | `api/Limits.java` | `Limits` | moved out of `view` in prep; extended with the 6.4.2 limits in T10 |
-| `validation/ValidationResult.java` | `view/ValidationResult.java` | `ValidationResult` | rewritten as a record in T10 |
-| `validation/Validator.java` | `view/Validator.java` | `Validator` | strict in tests, lenient in production, in T10 |
+| `validation/ValidationResult.java` | `api/ValidationResult.java` | `ValidationResult` | **PREP** moved to `api`; rewritten as a record in T10 |
+| `validation/Validator.java` | `api/Validator.java` | `Validator` | **PREP** moved to `api`; every outgoing view is checked by `ViewEditor` |
 
 ### 3.2 Not ported
 

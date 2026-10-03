@@ -2,6 +2,7 @@ package es.redactado.menu.view;
 
 import es.redactado.menu.api.MenuComponent;
 import es.redactado.menu.api.MenuContext;
+import es.redactado.menu.api.Validator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -69,7 +70,18 @@ public class MenuBuilder {
         return this;
     }
 
-    /** Render and validate into a JDA Container. */
+    /**
+     * Renders the components and validates the result.
+     *
+     * <p>Validating here as well as in the sender is deliberate. This check is
+     * synchronous, so a menu that breaks a limit fails at the call site during a
+     * test rather than later inside an asynchronous send chain.
+     *
+     * @param ctx the context of the current interaction
+     * @return the rendered, validated container
+     * @throws es.redactado.menu.api.ComponentLimitException if the container breaks
+     *     a hard limit
+     */
     public Container build(MenuContext ctx) {
         var rendered = new ArrayList<ContainerChildComponent>();
         for (var child : children) {

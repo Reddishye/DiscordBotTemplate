@@ -1,4 +1,4 @@
-package es.redactado.menu.view;
+package es.redactado.menu.api;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,8 +46,7 @@ public class ValidationResult {
 
     public void throwIfInvalid() {
         if (!errors.isEmpty()) {
-            throw new es.redactado.menu.api.ComponentLimitException(
-                    errors.size(), 0, String.join("; ", errors));
+            throw new ComponentLimitException(errors.size(), 0, String.join("; ", errors));
         }
     }
 

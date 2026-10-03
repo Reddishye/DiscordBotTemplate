@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
@@ -152,6 +153,10 @@ final class JdaMocks {
     private static WebhookMessageEditAction<Message> editAction() {
         WebhookMessageEditAction<Message> action = mock(WebhookMessageEditAction.class);
         when(action.useComponentsV2()).thenReturn(action);
+        when(action.submit())
+                .thenReturn(
+                        CompletableFuture.completedFuture(
+                                mock(net.dv8tion.jda.api.entities.Message.class)));
         return action;
     }
 

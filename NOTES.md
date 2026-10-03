@@ -688,6 +688,39 @@ page one and pagination was broken. It now reads and writes
 `session().state("page_" + key, Integer.class)`, so the page survives between
 clicks. The class is still replaced by `Pager<T>` in T10.
 
+### `Validator` moved to `api` so every outgoing view is validated
+
+`Validator` and `ValidationResult` lived in `view`, which meant `core` could not
+check a container without importing `view`. T5 noted this as the reason
+`Navigator` skipped validation; that is now fixed rather than deferred.
+
+`core.ViewEditor` is the single place a container reaches Discord. It runs
+`Validator.verify` first and, if the container breaks a hard limit, completes the
+future exceptionally **without** contacting Discord at all. A second test,
+`ViewEditorIsTheOnlyEditPathTest`, fails the build if
+`editOriginalComponents` appears in any main source other than `ViewEditor`, and
+also asserts `ViewEditor` really does contain the call, so the rule cannot be
+satisfied by deleting it.
+
+`ViewEditor` uses `submit()` rather than `queue()`, so a failed REST call becomes a
+failed future instead of vanishing.
+
+### `MenuBuilder.build` keeps its own validation on purpose
+
+The prep plan asked to remove the now-redundant `Validator.verify` from
+`MenuBuilder` only if that did not lose the early failure in tests. Removing it
+**would** lose something real, so it stays.
+
+`MenuBuilder.build` validates synchronously, so a menu that assembles more children
+than Discord allows throws at the construction site, with a stack pointing at the
+menu author's code, during a plain unit test. With `ViewEditor` alone the same
+mistake surfaces inside an asynchronous send chain, far from the mistake.
+
+The two checks are not duplicates in kind. The builder check is an ergonomics
+guard that fails fast at the point of construction; `ViewEditor` is the boundary
+check that protects Discord for any container that bypasses the builder. Both
+messages are the same generic one, so neither leaks internals.
+
 ### Hardcoded emoji that must move into presets
 
 Left in place by T1 because removing them changes rendered output:

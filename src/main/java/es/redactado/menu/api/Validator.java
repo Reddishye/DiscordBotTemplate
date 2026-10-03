@@ -1,6 +1,5 @@
-package es.redactado.menu.view;
+package es.redactado.menu.api;
 
-import es.redactado.menu.api.Limits;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.section.Section;
