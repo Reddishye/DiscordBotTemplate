@@ -47,21 +47,21 @@ public class MenuRouter {
         if (raw == null || raw.isEmpty()) return false;
 
         var parsed = ComponentId.decode(raw);
-        if (parsed == null) return false;
+        if (parsed.isEmpty()) return false;
 
         Menu menu;
         try {
-            menu = get(parsed.menuId());
+            menu = get(parsed.get().menuId());
         } catch (MenuNotFoundException e) {
-            LOG.warn("No menu registered for id: {}", parsed.menuId());
+            LOG.warn("No menu registered for id: {}", parsed.get().menuId());
             return false;
         }
 
         try {
-            var ctx = BaseContext.fromButton(event, parsed);
+            var ctx = BaseContext.fromButton(event, parsed.get());
             menu.onButton(ctx, event);
         } catch (Exception e) {
-            LOG.error("Error dispatching button for menu: {}", parsed.menuId(), e);
+            LOG.error("Error dispatching button for menu: {}", parsed.get().menuId(), e);
             event.reply("Error.").setEphemeral(true).queue();
         }
         return true;
@@ -74,21 +74,21 @@ public class MenuRouter {
 
         // Modal IDs: "menu:menuId:action:params..."
         var parsed = ComponentId.decode(mid);
-        if (parsed == null) return false;
+        if (parsed.isEmpty()) return false;
 
         Menu menu;
         try {
-            menu = get(parsed.menuId());
+            menu = get(parsed.get().menuId());
         } catch (MenuNotFoundException e) {
-            LOG.warn("No menu registered for modal: {}", parsed.menuId());
+            LOG.warn("No menu registered for modal: {}", parsed.get().menuId());
             return false;
         }
 
         try {
-            var ctx = BaseContext.fromModal(event, parsed);
+            var ctx = BaseContext.fromModal(event, parsed.get());
             menu.onModal(ctx, event);
         } catch (Exception e) {
-            LOG.error("Error dispatching modal for menu: {}", parsed.menuId(), e);
+            LOG.error("Error dispatching modal for menu: {}", parsed.get().menuId(), e);
             event.reply("Error.").setEphemeral(true).queue();
         }
         return true;

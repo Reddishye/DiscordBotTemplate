@@ -291,7 +291,7 @@ is the final path; the "Name" column is the final type name where it differs.
 | `component/SectionList.java` | `view/SectionList.java` | `SectionList` | superseded by `Pager<T>` in T10 |
 | `component/Text.java` | `view/Text.java` | `Text` | as-is |
 | `component/ThumbnailComponent.java` | `view/ThumbnailComponent.java` | `ThumbnailComponent` | broken cast, folded into `Section` in T10 |
-| `dispatch/ComponentId.java` | `core/ComponentId.java` | `ComponentId` | rewritten without `split` in T2 |
+| `dispatch/ComponentId.java` | `core/ComponentId.java` | `ComponentId` | **rewritten in T2**: `indexOf`/`substring` only, `decode` returns `Optional` |
 | `dispatch/MenuRouter.java` | `core/MenuRouter.java` | `MenuRouter` | rewritten as the O(1) dispatcher in T4 |
 | `exception/ComponentLimitException.java` | `api/ComponentLimitException.java` | `ComponentLimitException` | kept |
 | `exception/MenuException.java` | `api/MenuException.java` | `MenuException` | kept as the base type |
@@ -317,11 +317,11 @@ demonstrate the framework. Its bot-specific logic is not copied: neither the
 
 Carried over from the source, and each one contradicts a rule of the plan:
 
-- `ComponentId.decode` uses `String.split`, a regex, and a per-call
-  `ArrayList`. Section 3 requires `indexOf`/`substring` and a prebuilt map.
-- `ComponentId.decode` returns `null` for a bad prefix, so callers cannot tell a
-  foreign component from a malformed one. Section 5.3 requires an explicit
-  result.
+- `ComponentId.decode` used `String.split`, a regex, and a per-call `ArrayList`.
+  Section 3 requires `indexOf`/`substring` and a prebuilt map. **Fixed in T2.**
+- `ComponentId.decode` returned `null` for a bad prefix, so callers could not tell
+  a foreign component from a malformed one. Section 5.3 requires an explicit
+  result. **Fixed in T2:** it now returns `Optional<ComponentId>`.
 - `MenuRouter` holds menus in a `ConcurrentHashMap` and resolves them by
   exception on miss. Section 3 requires immutable snapshots and O(1) lookups
   without exceptions on the hot path.

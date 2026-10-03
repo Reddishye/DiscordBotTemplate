@@ -354,6 +354,64 @@ directly? Today only `Field` builds sections, and the tests call
 **Default.** No new component in T1b, to avoid inventing T10's API. Added in
 T10 alongside `Divider`, where section 5.3 requires `Section` anyway.
 
+### Package cycle between `core` and `view`
+
+`core.ComponentId` now imports `view.Limits` for
+`Limits.MAX_CUSTOM_ID_LENGTH`, because the plan specifies that constant as the
+single source of truth for the 100-character limit. `view` already imports
+`core.ComponentId`, for `ActionButton`, `Field`, and `SectionList`.
+
+Java allows the cycle, so it compiles, but it is a design smell: neither package
+is independent.
+
+**Question.** Should `Limits` move to `core`, or should the codec keep a local
+constant?
+
+**Default.** Keep the cycle for now and revisit in T10, when `view` is rewritten
+and `Limits` gains the full set of JDA 6.4.2 limits. If T10 does not resolve it,
+`Limits` moves to `core`, since `Limits` is more of a protocol concern than a
+presentation concern.
+
+### `ComponentId.require` still throws `IllegalArgumentException`
+
+The plan states this becomes `UserFacingException` in a later task, because a
+missing param is a user-visible problem and the message must be localized.
+Recorded here so it is not lost. `MenuContext.require` throws
+`StateNotFoundException` today for the same reason and is due the same change.
+
+### `decode` accepts a trailing colon as one empty param
+
+`menu:a:b:` decodes to menu {@code a}, action {@code b}, params {@code [""]},
+rather than being rejected.
+
+**Reason.** Encoding permits an empty param, so rejecting the round trip would
+make `encode` produce ids that `decode` refuses. Round-tripping losslessly
+matters more than rejecting a harmless trailing separator. `encode` is the place
+that rejects malformed input, since it is the only place that knows the
+caller's intent.
+
+**Question.** Should `encode` reject empty params instead, so no empty param can
+ever be produced?
+
+**Default.** No. An empty param is occasionally useful as a positional
+placeholder, and `decode` handles it unambiguously.
+
+### Throughput guard for `decode`
+
+`ComponentIdTest.Throughput` decodes one million ids and asserts completion.
+Measured at **87 ms** on this machine against a **10-second** bound, so roughly
+115x of headroom. The number is documented in the test's Javadoc. The bound is
+loose on purpose: the test guards against reintroducing `String.split` or a
+per-call array blowup, not against a throughput regression, so a tight bound
+would only add flake risk.
+
+### `ComponentId` error messages
+
+The length failure reports the length and the limit but deliberately does **not**
+include the offending id, because an over-length id is by definition large and
+would flood the log or the exception message. The segment failures name the
+segment, and a bad param also names its index.
+
 ### Hardcoded emoji that must move into presets
 
 Left in place by T1 because removing them changes rendered output:
