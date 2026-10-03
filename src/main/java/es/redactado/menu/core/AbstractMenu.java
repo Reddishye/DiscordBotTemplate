@@ -2,7 +2,6 @@ package es.redactado.menu.core;
 
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
-import es.redactado.menu.view.Validator;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
@@ -32,19 +31,9 @@ public abstract class AbstractMenu implements Menu {
 
     protected abstract Container build(MenuContext ctx);
 
-    @Override
-    public void onButton(MenuContext ctx, ButtonInteractionEvent event) {
-        if ("nav".equals(ctx.action())) handleBack(ctx, event);
-    }
-
-    @Override
-    public void onModal(MenuContext ctx, ModalInteractionEvent event) {}
-
-    protected Container renderValidated(MenuContext ctx) {
-        return Validator.verify(render(ctx));
-    }
-
-    /** Re-render and edit message. For ButtonInteraction: direct edit; for Modal: deferEdit + hook. */
+    /**
+     * Re-render and edit message. For ButtonInteraction: direct edit; for Modal: deferEdit + hook.
+     */
     protected void refresh(MenuContext ctx) {
         var container = render(ctx);
         var event = ctx.event();

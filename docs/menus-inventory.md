@@ -117,6 +117,23 @@ to `ServiceManager.stopAll()`, the conservative wiring is a single
 existing shutdown hook closes everything in reverse initialisation order without
 touching `Main`.
 
+### 1.6b Package dependency direction
+
+The menu packages depend on each other in one direction only, which the prep
+commit established:
+
+```
+api   ->  (no other menu package)
+core  ->  api
+view  ->  api, core
+```
+
+Two cycles had to be broken. `Limits` moved from `view` to `api`, because
+`core.ComponentId` needs `MAX_CUSTOM_ID_LENGTH` and `view` already needs
+`core.ComponentId`. `api.MenuComponent` stopped importing `view.Row` for a
+Javadoc link. Removing the dead `AbstractMenu.renderValidated` is what actually
+cleared `core` -> `view`, since it was the only user of `view.Validator` there.
+
 ### 1.7 Target file tree
 
 ```
@@ -137,7 +154,8 @@ src/test/java/es/redactado/
 src/test/java/es/redactado/menu/view/
   MenuBuilderTest.java
 src/main/java/es/redactado/menu/
-  api/                            Menu, MenuContext, MenuComponent, exceptions
+  api/                            Menu, MenuContext, MenuComponent, Ack,
+                                   ActionTable, Limits, exceptions
   core/                           MenuRouter, ComponentId, navigation, base classes
   view/                           MenuBuilder, components, Limits, Validator
   RowItem.java                   Action-row children: buttons and selects
@@ -299,7 +317,7 @@ is the final path; the "Name" column is the final type name where it differs.
 | `exception/StateNotFoundException.java` | `api/StateNotFoundException.java` | `StateNotFoundException` | replaced by `UserFacingException` in T5 |
 | `navigation/NavigationAction.java` | `core/NavigationAction.java` | `NavigationAction` | absorbed into the T5 navigation API |
 | `navigation/NavigationMode.java` | `core/NavigationMode.java` | `NavigationMode` | reduced to push/pop/replace/root in T5 |
-| `validation/Limits.java` | `view/Limits.java` | `Limits` | extended with the 6.4.2 limits in T10 |
+| `validation/Limits.java` | `api/Limits.java` | `Limits` | moved out of `view` in prep; extended with the 6.4.2 limits in T10 |
 | `validation/ValidationResult.java` | `view/ValidationResult.java` | `ValidationResult` | rewritten as a record in T10 |
 | `validation/Validator.java` | `view/Validator.java` | `Validator` | strict in tests, lenient in production, in T10 |
 

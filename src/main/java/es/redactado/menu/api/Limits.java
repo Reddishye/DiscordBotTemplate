@@ -1,4 +1,4 @@
-package es.redactado.menu.view;
+package es.redactado.menu.api;
 
 /**
  * Discord V2 component limits.

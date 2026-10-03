@@ -1,5 +1,6 @@
 package es.redactado.menu.view;
 
+import es.redactado.menu.api.Limits;
 import es.redactado.menu.api.MenuComponent;
 import es.redactado.menu.api.MenuContext;
 import java.util.ArrayList;

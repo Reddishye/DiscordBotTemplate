@@ -354,23 +354,35 @@ directly? Today only `Field` builds sections, and the tests call
 **Default.** No new component in T1b, to avoid inventing T10's API. Added in
 T10 alongside `Divider`, where section 5.3 requires `Section` anyway.
 
-### Package cycle between `core` and `view`
+### Package cycles, resolved in the prep commit
 
-`core.ComponentId` now imports `view.Limits` for
-`Limits.MAX_CUSTOM_ID_LENGTH`, because the plan specifies that constant as the
-single source of truth for the 100-character limit. `view` already imports
-`core.ComponentId`, for `ActionButton`, `Field`, and `SectionList`.
+Two cycles existed and both are gone.
 
-Java allows the cycle, so it compiles, but it is a design smell: neither package
-is independent.
+**`core` <-> `view`.** `core.ComponentId` imported `view.Limits` for
+`Limits.MAX_CUSTOM_ID_LENGTH`, while `view.ActionButton`, `view.Field`, and
+`view.SectionList` import `core.ComponentId` to build their ids. Resolved by
+moving `Limits` from `view` to `api`, with unchanged content. `api` is the right
+home: the limits are part of the protocol a menu must respect, not a
+presentation choice.
 
-**Question.** Should `Limits` move to `core`, or should the codec keep a local
-constant?
+**`api` -> `view`.** `api.MenuComponent` imported `view.Row` purely to resolve a
+`{@link Row}` in its Javadoc. Resolved by dropping the import and qualifying the
+Javadoc reference. `api` now has no dependency on any other menu package, which
+is the property section 4 implies but did not state.
 
-**Default.** Keep the cycle for now and revisit in T10, when `view` is rewritten
-and `Limits` gains the full set of JDA 6.4.2 limits. If T10 does not resolve it,
-`Limits` moves to `core`, since `Limits` is more of a protocol concern than a
-presentation concern.
+`core.AbstractMenu` also imported `view.Validator` for its `renderValidated`
+method, which had no callers anywhere in the tree. That dead method was removed,
+which is what actually cleared `core` -> `view`. `Validator` validates a rendered
+container, so it correctly stays in `view`; T4 replaces `AbstractMenu` with the
+dispatcher and `MenuBuilder` keeps calling `Validator` directly.
+
+Resulting direction, all one-way:
+
+```
+api   ->  (nothing)
+core  ->  api
+view  ->  api, core
+```
 
 ### `ComponentId.require` still throws `IllegalArgumentException`
 
