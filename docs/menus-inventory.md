@@ -134,6 +134,69 @@ nothing from the rest of the framework, so a preset can be read, tested, and
 serialised on its own. `api`, `core`, and `view` are free to import it; none of them
 does yet, because components start reading presets in T10.
 
+## Custom preset files
+
+One preset per file, `<dir>/<name>.json`, not recursive. The file name is part of the
+contract: `name` must equal it without the extension, so a file's location and its
+contents cannot disagree.
+
+`docs/presets/ocean.json` is the worked example and is loaded by
+`PresetLoaderTest`, so this section and the format cannot drift apart.
+
+```json
+{
+  "name": "ocean",
+  "extends": "midnight",
+  "description": "Cool blue theme for support menus.",
+  "palette": { "accent": "#1E90FF", "success": "#2ECC71" },
+  "icons": { "ok": "\uD83D\uDE80", "delete": "" },
+  "density": "comfortable",
+  "divider": { "visible": true, "gap": "large" },
+  "header": { "level": 2, "subtitle": true },
+  "buttons": { "primary": "secondary" },
+  "footer": "{menu}"
+}
+```
+
+Only `name` is required. Anything omitted is inherited from `extends`, or from the
+`default` preset when there is no `extends`. Objects merge field by field, so a
+partial `palette` changes only the colours it lists and a partial `header` changes
+only the keys it has.
+
+| Key | Values |
+| --- | --- |
+| `extends` | a built-in or custom preset name |
+| `description` | up to 120 characters |
+| `palette` | `accent`, `success`, `warning`, `danger`, `info`, `neutral`, each `#RRGGBB` |
+| `icons` | lowercase `IconKey` names to a Unicode emoji or `<:name:id>`, `""` to remove |
+| `density` | `compact`, `normal`, `comfortable` |
+| `divider` | `visible`, `gap` of `small` or `large` |
+| `header` | `level` from 1 to 3, `subtitle` |
+| `buttons` | role to style, all four of `primary`, `secondary`, `success`, `danger` |
+| `footer` | up to 200 characters, `{user}` and `{menu}` only |
+
+Words are matched case-insensitively. Unknown properties are errors at every level,
+because a misspelled key that is silently ignored is a change that appears to have
+been made and was not. Inheritance is resolved once, at load time: a loaded `Preset`
+has no parent and nothing to walk.
+
+A file over 64 KiB is rejected, and at most 200 files are read per pass, so one
+directory cannot make a reload unbounded. Neither limit is a real constraint for a
+hand-written preset, and both bound the cost of a mistake.
+
+Errors name the file and the field path rather than throwing, so one bad file costs
+its own preset and nothing else:
+
+```
+ocean.json: palette.accent: expected #RRGGBB, got 'blue'
+```
+
+`PresetStore` keeps the last version that loaded, so editing a file into an invalid
+state costs that preset's new values rather than the preset itself. Only a file that
+stops existing is dropped. Reloading can be manual, or automatic: `startWatching()`
+watches the directory on one daemon thread and reloads once writes have been quiet
+for 300 ms, so a burst of saves is one reload rather than twenty.
+
 `EmojiText` and `DefaultLook` are package-private inside `preset`. `EmojiText`
 exists because JDA does not validate emoji, and `DefaultLook` exists to break a
 class-initialisation cycle between `Preset` and `BuiltinPresets`.
@@ -185,7 +248,10 @@ src/main/java/es/redactado/menu/
   preset/                         Preset, Icons, Palette, Density, Gap,
                                    DividerStyle, HeaderStyle, ButtonRole,
                                    ButtonStyles, BuiltinPresets,
-                                   PresetRegistry, IconKey
+                                   PresetRegistry, IconKey,
+                                   PresetLoader, PresetStore, LoadResult,
+                                   LoadProblem, PresetPreferences,
+                                   InMemoryPresetPreferences
   view/                           MenuBuilder, components, Validator
   RowItem.java                   Action-row children: buttons and selects
   Accessory.java                 Section accessories: buttons and thumbnails
@@ -348,7 +414,7 @@ is the final path; the "Name" column is the final type name where it differs.
 | --- | --- | --- | --- |
 | `api/Component.java` | `api/MenuComponent.java` | `MenuComponent` | render contract fixed in T10 |
 | `api/Context.java` | `api/MenuContext.java` | `MenuContext` | state and back-stack moved to sessions in T5 |
-| `api/Menu.java` | `api/Menu.java` | `Menu` | **T3**: `onButton`/`onModal` replaced by `actions(ActionTable.Builder)` |
+| `api/Menu.java` | `api/Menu.java` | `Menu` | **T3**: `onButton`/`onModal` replaced by `actions(ActionTable.Builder)`; **T8**: gains `presetName()` so a menu can force a look |
 | `api/NavigationAware.java` | `api/NavigationAware.java` | `NavigationAware` | becomes the `onEnter`/`onLeave` hook in T5, or is removed |
 | `api/Renderable.java` | `api/Renderable.java` | `Renderable` | unused, removed in T14 |
 | `base/AbstractMenu.java` | `core/AbstractMenu.java` | `AbstractMenu` | **T3** registers the built-in `nav` action; **T5** the nav action delegates to `Navigator` |

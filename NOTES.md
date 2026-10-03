@@ -803,6 +803,66 @@ The lesson worth keeping: a class whose static initialiser builds instances of
 another class that refers back to it will fail in a way that looks like a null
 pointer rather than an initialisation problem.
 
+### `PresetLoader` uses the tree model, not data binding, for three reasons
+
+Data binding was rejected on purpose. Each of the three behaviours the format needs is
+awkward or impossible with it:
+
+1. **Unknown properties are errors at any depth.** `@JsonIgnoreProperties` only covers
+   one level, and a typo like `palette.background` would otherwise be silently
+   dropped, producing a change that looks applied and was not.
+2. **Errors name the field path.** Binding reports "cannot deserialize from String",
+   not `palette.accent: expected #RRGGBB, got 'blue'`. Since the whole point of a
+   load result is that a human reads it, the message is the feature.
+3. **A partial object means inherit, not default.** With data binding, an absent
+   `palette` and a `palette` of nulls look the same to the setter.
+
+`JsonParser.Feature.STRICT_DUPLICATE_DETECTION` is on, so `{"name":"a","name":"b"}`
+is an error rather than last-wins. A duplicated key in a hand-edited file is nearly
+always a mistake, and silently taking one of them hides it.
+
+### Cycles report every file, and that needed a second pass to get right
+
+The first version reported a cycle and then, on the way back up, also reported
+`parent 'X' failed to load` for each member. So a two-file cycle produced four
+messages for two mistakes, and `failed to load` was actively wrong: nothing had
+failed to load, the two files were pointing at each other.
+
+The walk now tracks the names on a cycle separately and reports
+`extends: is part of a cycle with other.json` once per member. A file whose parent is
+on a cycle but which is not itself on it gets `parent 'X' is part of a cycle`, which
+is the true reason it did not load. A parent that is simply unreadable still gets the
+specified `parent 'X' failed to load`.
+
+### A failed parent is distinguished from a missing one
+
+A child of a file that failed to parse gets `parent 'X' failed to load`; a child of a
+name nothing defines gets `no preset named 'X'`. These read almost the same and mean
+different things: the first is fixed by repairing a file that exists, the second by
+creating or correcting a name. Collapsing them would send an author to the wrong place.
+
+To make that possible the loader keeps the set of file names it could not read. A
+file that fails validation is simply absent from the parsed map, which on its own is
+indistinguishable from a typo in `extends`.
+
+### Emoji in JSON are `\\uXXXX` escapes, so the files stay ASCII
+
+`ocean.json` uses `\\uD83D\\uDE80` for the rocket rather than the character. A
+literal emoji in a JSON file survives fine until someone edits the file in an editor
+with a different encoding, or a transfer mangles it, and the damage is invisible in a
+diff. `AsciiSourcesTest` only covers Java sources, so this is a separate decision.
+
+### Filesystem tests are tagged and may be slow
+
+`PresetStoreTest.Watching` is `@Tag("filesystem")` and uses real file events. The
+debounce test needs real time, since it asserts that twenty rapid writes produce at
+most two reloads, and there is no way to make a `WatchService` wait faster. The other
+watching tests use latches with a ten second bound rather than sleeping.
+
+Skip them with `./gradlew test -PexcludeTags=filesystem` if a file system turns out to
+be unreliable; they are the only tests that touch timing. The tag is wired up in
+`build.gradle.kts` so a tag nobody can act on would be no use.
+
 ### Two public methods were removed after auditing T7 against the written spec
 
 `Preset` shipped with `renderFooter(userId, menuId)` and `iconValues()` that the

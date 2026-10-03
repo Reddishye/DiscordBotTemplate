@@ -1,6 +1,7 @@
 package es.redactado.menu.api;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.components.container.Container;
 
@@ -41,6 +42,23 @@ public interface Menu {
      */
     default NavEntry home(MenuContext ctx) {
         return new NavEntry(id(), "home", List.of());
+    }
+
+    /**
+     * Forces a look for this menu, whatever the guild and the user asked for.
+     *
+     * <p>A menu that reports a name here is rendered with that preset and no
+     * preference is consulted, so a name that no longer resolves is skipped and
+     * resolution continues as if the menu had not asked. That is deliberate: a
+     * preset file can be renamed or deleted while a bot is running, and a menu
+     * must not stop rendering because of it.
+     *
+     * <p>Empty by default, which means the menu follows the preferences.
+     *
+     * @return the preset name to force, or empty to follow the preferences
+     */
+    default Optional<String> presetName() {
+        return Optional.empty();
     }
 
     /**

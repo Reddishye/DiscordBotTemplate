@@ -90,16 +90,33 @@ public record Preset(
                     "preset '%s': footer is %d characters, the limit is %d"
                             .formatted(name, footer.length(), MAX_FOOTER_LENGTH));
         }
+        String unsupported = unsupportedPlaceholder(footer);
+        if (unsupported != null) {
+            throw new IllegalArgumentException(
+                    "preset '%s': footer placeholder '%s' is not supported, only {user} and {menu} are"
+                            .formatted(name, unsupported));
+        }
+        return footer;
+    }
+
+    /**
+     * The first placeholder in {@code footer} that is not supported.
+     *
+     * <p>Package-private so the JSON loader can name the offending placeholder without
+     * restating the rule; two copies of it would eventually disagree.
+     *
+     * @param footer the footer to inspect
+     * @return the placeholder including its braces, or null when every one is supported
+     */
+    static String unsupportedPlaceholder(String footer) {
         Matcher matcher = PLACEHOLDER.matcher(footer);
         while (matcher.find()) {
             String key = matcher.group(1);
             if (!key.equals("user") && !key.equals("menu")) {
-                throw new IllegalArgumentException(
-                        "preset '%s': footer placeholder '%s' is not supported, only {user} and {menu} are"
-                                .formatted(name, "{" + key + "}"));
+                return "{" + key + "}";
             }
         }
-        return footer;
+        return null;
     }
 
     /**

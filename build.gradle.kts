@@ -68,7 +68,16 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    // Filesystem tests drive a real WatchService and can be slow on some file systems.
+    // Skip them with: ./gradlew test -PexcludeTags=filesystem
+    val excludedTags: String? = providers.gradleProperty("excludeTags").orNull
+    useJUnitPlatform {
+        if (excludedTags != null) {
+            excludedTags.split(",").map(String::trim).filter(String::isNotEmpty).forEach { tag ->
+                excludeTags(tag)
+            }
+        }
+    }
 
     jvmArgs("-javaagent:${mockitoAgent.asPath}")
 

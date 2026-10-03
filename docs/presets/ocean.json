@@ -1,0 +1,28 @@
+{
+  "name": "ocean",
+  "extends": "midnight",
+  "description": "Cool blue theme for support menus.",
+  "palette": {
+    "accent": "#1E90FF",
+    "success": "#2ECC71"
+  },
+  "icons": {
+    "ok": "\uD83D\uDE80",
+    "back": "\u2B07\uFE0F",
+    "delete": ""
+  },
+  "density": "comfortable",
+  "divider": {
+    "visible": true,
+    "gap": "large"
+  },
+  "header": {
+    "level": 2,
+    "subtitle": true
+  },
+  "buttons": {
+    "primary": "secondary",
+    "danger": "danger"
+  },
+  "footer": "{menu}"
+}
