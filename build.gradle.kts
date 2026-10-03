@@ -14,6 +14,8 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+
 dependencies {
     implementation("net.dv8tion:JDA:6.4.2") { exclude(module = "opus-java") }
     implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
