@@ -145,8 +145,7 @@ class NavigatorAsyncRenderTest {
         Menu target = menuRendering(pending);
         ButtonInteractionEvent event = JdaMocks.button("menu:a:nav:push:b", true, MESSAGE, CLICKER);
 
-        MenuRouter router =
-                new MenuRouter(MenuExecutor.virtual(), new SessionStore(SessionConfig.defaults()));
+        MenuRouter router = TestRouters.create();
         try {
             router.register(
                     "a",

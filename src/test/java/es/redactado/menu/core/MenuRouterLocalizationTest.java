@@ -130,7 +130,8 @@ class MenuRouterLocalizationTest {
 
     private MenuRouter newRouter(Menu menu) {
         SessionStore sessions = new SessionStore(SessionConfig.defaults());
-        MenuRouter created = new MenuRouter(MenuExecutor.virtual(), sessions, Messages.standard());
+        MenuRouter created =
+                MenuRouter.builder().sessions(sessions).messages(Messages.standard()).build();
         created.register(menu.id(), menu);
         return created;
     }

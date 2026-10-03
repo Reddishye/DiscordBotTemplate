@@ -127,7 +127,7 @@ class MenuExecutorTest {
     @DisplayName("the router exposes its executor")
     void routerExposesExecutor() {
         executor = MenuExecutor.virtual();
-        MenuRouter router = new MenuRouter(executor, new SessionStore(SessionConfig.defaults()));
+        MenuRouter router = TestRouters.withExecutor(executor);
 
         assertThat(router.executor()).isSameAs(executor);
         assertThat(router.executor().supply(() -> List.of(1, 2)).join()).containsExactly(1, 2);

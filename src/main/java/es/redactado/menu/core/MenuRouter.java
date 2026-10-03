@@ -7,6 +7,8 @@ import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.MenuNotFoundException;
 import es.redactado.menu.api.ModalAction;
+import es.redactado.menu.preset.InMemoryPresetPreferences;
+import es.redactado.menu.preset.PresetRegistry;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -52,36 +54,135 @@ public final class MenuRouter implements AutoCloseable {
     private final MenuExecutor executor;
     private final SessionStore sessions;
     private final Messages messages;
+    private final PresetResolver presets;
+    private final boolean ownsExecutor;
+    private final boolean ownsSessions;
     private final InteractionGuard guard = new InteractionGuard();
     private final Navigator navigator;
 
     /** A menu paired with the immutable action table built from it. */
     private record Registered(Menu menu, ActionTable table) {}
 
-    /**
-     * Creates a router that runs handlers on the given executor, keeps navigation
-     * history in the given store, and answers in the bundles shipped with the
-     * template.
-     *
-     * @param executor the executor that runs handler bodies
-     * @param sessions the store holding one session per menu message
-     */
-    public MenuRouter(MenuExecutor executor, SessionStore sessions) {
-        this(executor, sessions, Messages.standard());
-    }
-
-    /**
-     * Creates a router with a specific set of bundles.
-     *
-     * @param executor the executor that runs handler bodies
-     * @param sessions the store holding one session per menu message
-     * @param messages where user-facing text is resolved from
-     */
-    public MenuRouter(MenuExecutor executor, SessionStore sessions, Messages messages) {
+    private MenuRouter(
+            MenuExecutor executor,
+            SessionStore sessions,
+            Messages messages,
+            PresetResolver presets,
+            boolean ownsExecutor,
+            boolean ownsSessions) {
         this.executor = executor;
         this.sessions = sessions;
         this.messages = messages;
+        this.presets = presets;
+        this.ownsExecutor = ownsExecutor;
+        this.ownsSessions = ownsSessions;
         this.navigator = new Navigator(this::get, sessions, messages);
+    }
+
+    /**
+     * Starts building a router.
+     *
+     * <p>Replaces the public constructors because the parameter list had reached four
+     * and every new capability made it worse. A caller who supplies nothing gets a
+     * working router over the template's own defaults: a virtual-thread executor, an
+     * in-memory session store, the bundled messages, and a resolver over a fresh
+     * registry with no persisted preferences.
+     *
+     * @return a new builder
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Assembles a {@link MenuRouter}.
+     *
+     * <p>Every component is optional and has a working default, so the only required
+     * call is {@link #build()}.
+     */
+    public static final class Builder {
+
+        private MenuExecutor executor;
+        private SessionStore sessions;
+        private Messages messages;
+        private PresetResolver presets;
+
+        private Builder() {}
+
+        /**
+         * Sets the executor that runs handler bodies.
+         *
+         * <p>A supplied executor is owned by the caller: the router will not close it.
+         *
+         * @param executor the executor
+         * @return this builder
+         */
+        public Builder executor(MenuExecutor executor) {
+            this.executor = executor;
+            return this;
+        }
+
+        /**
+         * Sets the store holding one session per menu message.
+         *
+         * <p>A supplied store is owned by the caller: the router will not close it.
+         *
+         * @param sessions the store
+         * @return this builder
+         */
+        public Builder sessions(SessionStore sessions) {
+            this.sessions = sessions;
+            return this;
+        }
+
+        /**
+         * Sets where user-facing text is resolved from.
+         *
+         * @param messages the bundles
+         * @return this builder
+         */
+        public Builder messages(Messages messages) {
+            this.messages = messages;
+            return this;
+        }
+
+        /**
+         * Sets how each interaction finds its preset.
+         *
+         * <p>A supplied resolver is owned by the caller, including anything it owns such
+         * as a registry.
+         *
+         * @param presets the resolver
+         * @return this builder
+         */
+        public Builder presets(PresetResolver presets) {
+            this.presets = presets;
+            return this;
+        }
+
+        /**
+         * Builds the router.
+         *
+         * @return a router that closes only the components it created
+         */
+        public MenuRouter build() {
+            MenuExecutor chosenExecutor = executor != null ? executor : MenuExecutor.virtual();
+            SessionStore chosenSessions =
+                    sessions != null ? sessions : new SessionStore(SessionConfig.defaults());
+            Messages chosenMessages = messages != null ? messages : Messages.standard();
+            PresetResolver chosenPresets =
+                    presets != null
+                            ? presets
+                            : new PresetResolver(
+                                    new PresetRegistry(), new InMemoryPresetPreferences(), false);
+            return new MenuRouter(
+                    chosenExecutor,
+                    chosenSessions,
+                    chosenMessages,
+                    chosenPresets,
+                    executor == null,
+                    sessions == null);
+        }
     }
 
     /**
@@ -414,9 +515,25 @@ public final class MenuRouter implements AutoCloseable {
                 event.getGuild() == null ? DiscordLocale.UNKNOWN : event.getGuildLocale());
     }
 
+    /**
+     * Releases what this router created.
+     *
+     * <p><strong>The rule is that a component is closed by whoever created it.</strong> A
+     * router built with the builder and no arguments owns its executor and its session
+     * store and closes them. Anything supplied to the builder belongs to the caller and
+     * is left running, because a shared executor outlives one router and closing it
+     * would silently break the next one. {@link Builder#build()} records which of the two
+     * happened rather than guessing.
+     *
+     * <p>Idempotent in effect: closing the same underlying executor twice is harmless.
+     */
     @Override
     public void close() {
-        executor.close();
-        sessions.close();
+        if (ownsExecutor) {
+            executor.close();
+        }
+        if (ownsSessions) {
+            sessions.close();
+        }
     }
 }

@@ -89,8 +89,7 @@ class MenuRouterThroughputTest {
                     return future;
                 };
 
-        MenuRouter router =
-                new MenuRouter(MenuExecutor.virtual(), new SessionStore(SessionConfig.defaults()));
+        MenuRouter router = TestRouters.create();
         router.register("m", new CountingMenu(handler));
 
         long before = System.nanoTime();
@@ -125,8 +124,7 @@ class MenuRouterThroughputTest {
                     return Done.NOW;
                 };
 
-        MenuRouter router =
-                new MenuRouter(MenuExecutor.virtual(), new SessionStore(SessionConfig.defaults()));
+        MenuRouter router = TestRouters.create();
         router.register("m", new CountingMenu(handler));
         for (int i = 0; i < 8; i++) {
             router.dispatchButton(JdaMocks.button("menu:m:go", false, i, JdaMocks.NO_OWNER));

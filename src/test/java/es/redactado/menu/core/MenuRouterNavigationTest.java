@@ -39,8 +39,7 @@ class MenuRouterNavigationTest {
     void navButtonReachesNavigator() {
         Menu target = stubMenu("b");
 
-        MenuRouter router =
-                new MenuRouter(MenuExecutor.virtual(), new SessionStore(SessionConfig.defaults()));
+        MenuRouter router = TestRouters.create();
         try {
             router.register(
                     "a",
@@ -89,7 +88,7 @@ class MenuRouterNavigationTest {
         Menu target = stubMenu("b");
         SessionStore sessions = new SessionStore(SessionConfig.defaults());
 
-        MenuRouter router = new MenuRouter(MenuExecutor.virtual(), sessions);
+        MenuRouter router = TestRouters.withSessions(sessions);
         try {
             router.register(
                     "a",

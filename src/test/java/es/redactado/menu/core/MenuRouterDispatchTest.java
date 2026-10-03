@@ -75,8 +75,7 @@ class MenuRouterDispatchTest {
     }
 
     private static MenuRouter router(ButtonHandler handler, boolean shared) {
-        MenuRouter router =
-                new MenuRouter(MenuExecutor.virtual(), new SessionStore(SessionConfig.defaults()));
+        MenuRouter router = TestRouters.create();
         router.register("m", new SimpleMenu(handler, shared));
         return router;
     }
@@ -357,9 +356,7 @@ class MenuRouterDispatchTest {
             ExecutorService rejecting = mock(ExecutorService.class);
             doThrow(new RejectedExecutionException()).when(rejecting).execute(any(Runnable.class));
 
-            MenuRouter router =
-                    new MenuRouter(
-                            MenuExecutor.of(rejecting), new SessionStore(SessionConfig.defaults()));
+            MenuRouter router = TestRouters.withExecutor(MenuExecutor.of(rejecting));
             router.register("m", new SimpleMenu(instantHandler(), false));
             ButtonInteractionEvent event = clickFrom(1000L, CLICKER);
 
