@@ -16,12 +16,24 @@ repositories {
 
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 
+/**
+ * Mockito's inline mock maker loads Byte Buddy's agent through the JDK's
+ * self-attach mechanism, which is deprecated from JDK 21 onward and prints a
+ * warning on every test JVM start. Resolving the agent separately lets the test
+ * task load it at launch instead. Kept in its own configuration so it never
+ * reaches the runtime classpath.
+ */
+val mockitoAgent: Configuration by configurations.creating
+
 dependencies {
     implementation("net.dv8tion:JDA:6.4.2") { exclude(module = "opus-java") }
     implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
     implementation("com.google.inject:guice:7.0.0") // Dependency Injection
     implementation("com.github.ben-manes.caffeine:caffeine:v3.2.2")
     implementation("com.github.ben-manes.caffeine:jcache:v3.2.2")
+
+    // Preset files are JSON, parsed with the version JDA already resolves
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.19.1")
     implementation("io.github.cdimascio:dotenv-java:3.2.0")
 
     implementation("ch.qos.logback:logback-classic:1.5.18")
@@ -43,6 +55,28 @@ dependencies {
     implementation("org.mariadb.jdbc:mariadb-java-client:3.5.7")
     implementation("org.xerial:sqlite-jdbc:3.50.3.0")
     implementation("com.h2database:h2:2.3.232")
+
+    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("org.mockito:mockito-junit-jupiter:5.14.2")
+    testImplementation("org.assertj:assertj-core:3.26.3")
+
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    mockitoAgent("net.bytebuddy:byte-buddy-agent:1.17.6")
+}
+
+tasks.test {
+    useJUnitPlatform()
+
+    jvmArgs("-javaagent:${mockitoAgent.asPath}")
+
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+    }
 }
 
 application {
