@@ -11,6 +11,7 @@ import es.redactado.menu.api.ActionTable;
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.SelectHandler;
+import es.redactado.menu.api.Session;
 import es.redactado.menu.preset.BuiltinPresets;
 import es.redactado.menu.preset.InMemoryPresetPreferences;
 import es.redactado.menu.preset.Preset;
@@ -241,6 +242,39 @@ class MenuRouterSelectTest {
                     .as("a completed handler must not leave the message claimed")
                     .isZero();
         }
+    }
+
+    @Test
+    @DisplayName("the handler gets the session for its message, so state survives")
+    void handlerGetsItsSession() {
+        StringSelectInteractionEvent first =
+                JdaMocks.select("menu:m:pick", true, MESSAGE, CLICKER, "a");
+        StringSelectInteractionEvent second =
+                JdaMocks.select("menu:m:pick", true, MESSAGE, CLICKER, "b");
+        AtomicReference<String> seenByTheSecond = new AtomicReference<>();
+
+        // A select context with no session of its own would hand every submission a
+        // fresh, empty one, so the second would read nothing. That is the regression.
+        try (MenuRouter router =
+                TestRouters.with(
+                        selectMenu(
+                                Ack.NONE,
+                                (ctx, e) -> {
+                                    Session session = ctx.session();
+                                    seenByTheSecond.set(
+                                            session.state("picks", String.class).orElse(""));
+                                    session.putState("picks", e.getValues().getFirst());
+                                    return CompletableFuture.completedFuture(null);
+                                }))) {
+            assertThat(router.dispatchSelect(first)).isTrue();
+            awaitIdle(router);
+            assertThat(router.dispatchSelect(second)).isTrue();
+            awaitIdle(router);
+        }
+
+        assertThat(seenByTheSecond.get())
+                .as("a later submission reads what the first one stored")
+                .isEqualTo("a");
     }
 
     // ------------------------------------------------------------- helpers

@@ -22,6 +22,7 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.interactions.DiscordLocale;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
+import net.dv8tion.jda.api.interactions.components.ComponentInteraction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 
 /**
@@ -153,10 +154,7 @@ public final class BaseContext implements MenuContext {
             Navigator navigator,
             Messages messages,
             Preset preset) {
-        Message message =
-                event instanceof ButtonInteractionEvent button
-                        ? button.getMessage()
-                        : event instanceof ModalInteractionEvent modal ? modal.getMessage() : null;
+        Message message = messageOf(event);
         OptionalLong messageId =
                 message == null ? OptionalLong.empty() : OptionalLong.of(message.getIdLong());
         return new BaseContext(
@@ -176,6 +174,25 @@ public final class BaseContext implements MenuContext {
                 navigator,
                 messages,
                 preset);
+    }
+
+    /**
+     * The message an interaction happened on, or null when there is none.
+     *
+     * <p>Asked of {@link ComponentInteraction} rather than of each event type, because a
+     * context without a message has no session and therefore no page and no history.
+     * Matching on the two kinds that existed when this was written quietly gave every
+     * later interaction kind a throwaway session, which is invisible until a select
+     * handler tries to remember anything.
+     *
+     * <p>A modal submission is not a {@code ComponentInteraction}, and its message is
+     * {@code null} for a modal opened outside a message, so it is asked separately.
+     */
+    private static Message messageOf(IReplyCallback event) {
+        if (event instanceof ComponentInteraction component) {
+            return component.getMessage();
+        }
+        return event instanceof ModalInteractionEvent modal ? modal.getMessage() : null;
     }
 
     /**

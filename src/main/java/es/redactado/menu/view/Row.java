@@ -26,8 +26,9 @@ public final class Row implements MenuComponent {
      *
      * @param items the buttons or selects in this row
      * @return the row
-     * @throws IllegalArgumentException if no items are given, or more than
-     *     {@link Limits#MAX_ACTION_ROW_CHILDREN} are
+     * @throws IllegalArgumentException if no items are given, if more than
+     *     {@link Limits#MAX_ACTION_ROW_CHILDREN} are, or if a {@link SelectMenu} shares
+     *     the row with anything else
      */
     public static Row of(RowItem... items) {
         if (items.length == 0) {
@@ -38,7 +39,28 @@ public final class Row implements MenuComponent {
                     "A row accepts at most %d items, got %d"
                             .formatted(Limits.MAX_ACTION_ROW_CHILDREN, items.length));
         }
+        rejectSharedSelect(items);
         return new Row(List.of(items));
+    }
+
+    /**
+     * Rejects a select menu sharing its row.
+     *
+     * <p>Discord gives a select the full width of the row and no more, so anything beside
+     * it is discarded by the client without an error reaching the bot. Catching it here
+     * turns a silently missing button into a failure in the menu author's own test.
+     */
+    private static void rejectSharedSelect(RowItem[] items) {
+        if (items.length < 2) {
+            return;
+        }
+        for (RowItem item : items) {
+            if (item instanceof SelectMenu) {
+                throw new IllegalArgumentException(
+                        "A select menu must be the only item in its row, but the row has %d items"
+                                .formatted(items.length));
+            }
+        }
     }
 
     @Override

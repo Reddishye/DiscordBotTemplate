@@ -1157,3 +1157,144 @@ event. What should `Back` do on the first press of a root menu?
 **Default.** Render the menu's declared root view in place, with no message. This
 is what section 5.4 requires for an expired session, and reusing it avoids a
 special case.
+## Build environment
+
+### The working tree was not clean when T10b resumed, and still is not mine
+
+`9499d86` was clean when this task started. Four uncommitted local edits sit
+beside it and are **not** part of any menu commit:
+
+| File | Local change |
+| --- | --- |
+| `build.gradle.kts` | `java.toolchain` 21 to 27 |
+| `gradle/wrapper/gradle-wrapper.properties` | Gradle 9.0.0 to 9.8.0 |
+| `gradlew` | mode change, no content change |
+| `src/main/java/es/redactado/service/TaskManager.java` | a full rewrite, 317 added lines |
+| `src/main/java/es/redactado/config/Listeners.java` | `CommandListener` added to the list |
+
+They are left exactly as found and are never staged, so `gradlew`,
+`Listeners.java` and `TaskManager.java` appear in no commit from this point on.
+
+Two consequences worth stating plainly:
+
+1. **The menu package now compiles on Java 27, not 21.** The committed
+   `build.gradle.kts` still pins 21, so `main version: 65` remains what the
+   repository produces; the local override produced `main version: 71` while
+   these tests ran. Nothing in the menu package depends on a version between the
+   two, but the 506 earlier tests were last run on 21 and the 543 now include
+   the select ones run on 27.
+2. **`spotlessApply` reformatted `TaskManager.java`.** The prescribed build
+   command includes it, and that file had three violations before this task. The
+   change is line wrapping in one log call and nothing else; it stays unstaged
+   with the rest of that file.
+
+## T10b commit 5: string select menus
+
+### `view.SelectMenu` shares a simple name with a JDA type
+
+Section 4 requires renaming a menu type that clashes with JDA. `SelectMenu` is
+the name T10b specifies for this component, and JDA does have
+`net.dv8tion.jda.api.components.selections.SelectMenu`, so the clash is real and
+is left in place on purpose.
+
+**Decision.** The name stays `SelectMenu`, because the task specifies it and the
+clash is unreachable rather than merely inconvenient: `api.Limits` reads every
+number from JDA, so no file in `menu` imports JDA's `SelectMenu` at all. Only
+`StringSelectMenu`, which has no simple-name collision, is imported where a JDA
+type is needed.
+
+**Would change the design if renamed differently.** A rename to `MenuSelect`
+would touch the Javadoc of every component and the README component table, and
+would contradict the task's own naming.
+
+### `option(value, label)` is the reverse of JDA's `addOption(label, value)`
+
+JDA takes the label first. This component takes the value first, on purpose: the
+value is what a handler receives and the label is what a user reads, so the
+argument order follows the direction the data travels. A swapped pair still
+renders, so nothing about the output would reveal the mistake; that is why
+`SelectMenuTest` asserts values and labels separately rather than only counting
+options.
+
+**Question.** Should the framework mirror JDA instead, for the sake of anyone
+arriving from JDA?
+
+**Default.** No. The framework's own components (`Field.of(label, value)`)
+already put the label first for a component where the user reads it, and the two
+orderings are each right for their own type.
+
+### `selected` is not cross-checked against `range`
+
+The count of defaults must fit the required range, or Discord rejects the select.
+The check is **not** done in `selected`, because a select is immutable and either
+call may come first; validating there would make the outcome depend on the order
+a menu author happened to write. It is left to JDA's `build`, which rejects it
+with a message naming the range, and `SelectMenuTest.defaultsMustFitTheRange`
+pins that behaviour so it cannot be mistaken for something this component
+silently ignores.
+
+**Default.** Keep it. Adding a `build()`-like terminal call to cross-validate
+would be the alternative.
+
+### A select needs at least one option, and only `render` can know
+
+`option` comes after `of`, so "at least one option" cannot be checked at
+construction. It is checked in `render`, where the message names the action,
+rather than left to JDA's message, which does not. The failure therefore surfaces
+inside a menu author's own test, because `MenuBuilder.build` renders
+synchronously.
+
+### JDA 6.4.2 select facts worth recording
+
+Checked in `JDA-6.4.2-sources.jar`, none of them obvious from the interface:
+
+- `StringSelectMenu.create` takes **only** a custom id. There is no
+  `create(id, placeholder)`; the placeholder is `setPlaceholder`, which rejects an
+  empty string but accepts `null`.
+- `SelectMenu.PLACEHOLDER_MAX_LENGTH` is **100**, not 150. `ID_MAX_LENGTH` is
+  100, `OPTIONS_MAX_AMOUNT` is 25.
+- `build()` rejects zero options, a `min` greater than `max`, and default values
+  outside the range, and it **silently clamps** `min` and `max` to the number of
+  options. So a select of three options declared `range(1, 5)` renders as `1..3`,
+  which is worth knowing before a test asserts on the range.
+- `addOption(label, value, description, emoji)` is the only overload accepting a
+  null description; the three-argument one declares it `@Nonnull`.
+- `SelectOption` validates label and value non-empty and all three lengths, so the
+  framework's own checks exist to fail earlier and to name the offending value.
+
+### A select submission had no session, and every later kind would have had none either
+
+A real bug, found by the select end-to-end test and not present in the known
+defects. `BaseContext.from` matched the event type by hand:
+
+```java
+Message message =
+        event instanceof ButtonInteractionEvent button
+                ? button.getMessage()
+                : event instanceof ModalInteractionEvent modal ? modal.getMessage() : null;
+```
+
+`StringSelectInteractionEvent` matched neither arm, so its context had
+`messageId` empty, and every call to `ctx.session()` returned **a new throwaway
+`Session`** while `ctx.findSession()` returned empty. A select handler could not
+keep a page, a history, or any state at all.
+
+The fix asks the shared supertype, which is what makes the omission structurally
+impossible rather than merely absent today:
+
+```java
+if (event instanceof ComponentInteraction component) {
+    return component.getMessage();
+}
+return event instanceof ModalInteractionEvent modal ? modal.getMessage() : null;
+```
+
+`ComponentInteraction` declares `getMessage()`, and both `ButtonInteractionEvent`
+and `StringSelectInteractionEvent` are one. `ModalInteractionEvent` is **not** a
+`ComponentInteraction`, so it keeps its own branch, where `getMessage()` is
+`@Nullable` for a modal opened outside a message.
+
+Why the commit 1 tests missed it: `MenuRouterSelectTest` asserted
+acknowledgement, ownership, the guard and the error path, none of which touch the
+session. `MenuRouterSelectTest.handlerGetsItsSession` now covers it and fails
+without the fix, verified by stashing `BaseContext.java` and re-running.

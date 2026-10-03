@@ -21,6 +21,8 @@ import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.buttons.ButtonStyle;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
+import net.dv8tion.jda.api.components.selections.SelectOption;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.components.separator.Separator;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.entities.User;
@@ -74,6 +76,7 @@ class PresetRenderingGoldenTest {
                                 ActionButton.danger("d", "D")))
                 .add(Row.of(ActionButton.primary("e", "E").icon(IconKey.BACK)))
                 .add(Row.of(LinkButton.of(LINK, "Docs").icon(IconKey.LINK)))
+                .add(Row.of(SelectMenu.of("pick", "Pick one").option("a", "A").option("b", "B")))
                 .add(Gallery.of(IMAGE))
                 .build(ctx);
     }
@@ -367,6 +370,27 @@ class PresetRenderingGoldenTest {
         return container.getComponents();
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("presets")
+    @DisplayName("a select offers the same options under every preset, having no style of its own")
+    void selectIgnoresThePreset(String name, Preset preset) {
+        Container container = render(preset);
+        StringSelectMenu select = selects(container).getFirst();
+
+        assertThat(select.getOptions())
+                .as("%s must not change what a select offers", name)
+                .extracting(SelectOption::getValue)
+                .containsExactly("a", "b");
+        assertThat(select.getPlaceholder()).isEqualTo("Pick one");
+        assertThat(rowsHolding(container, StringSelectMenu.class::isInstance))
+                .as("a select fills its row alone, as Discord requires")
+                .allSatisfy(
+                        row ->
+                                assertThat(row.getComponents())
+                                        .as("a select is never beside another item")
+                                        .hasSize(1));
+    }
+
     @Test
     @DisplayName("the sample menu exercises every component")
     void sampleMenuIsComplete() {
@@ -375,5 +399,38 @@ class PresetRenderingGoldenTest {
         assertThat(texts(container)).isNotEmpty();
         assertThat(separators(container)).hasSize(2);
         assertThat(buttons(container)).isNotEmpty();
+        assertThat(selects(container)).hasSize(1);
+    }
+
+    /** The selects in the container, found by descending into the action rows. */
+    private static List<StringSelectMenu> selects(Container container) {
+        List<StringSelectMenu> found = new ArrayList<>();
+        for (ContainerChildComponent component : children(container)) {
+            if (component instanceof ActionRow row) {
+                row.getComponents().stream()
+                        .filter(StringSelectMenu.class::isInstance)
+                        .map(StringSelectMenu.class::cast)
+                        .forEach(found::add);
+            }
+        }
+        return found;
+    }
+
+    /**
+     * The action rows holding at least one item of the given kind.
+     *
+     * <p>Written as a row search rather than a select search because the property under
+     * test belongs to the row: a select beside a button is not a select problem, it is a
+     * row that Discord will drop an item from.
+     */
+    private static List<ActionRow> rowsHolding(
+            Container container, java.util.function.Predicate<Object> kind) {
+        List<ActionRow> found = new ArrayList<>();
+        for (ContainerChildComponent component : children(container)) {
+            if (component instanceof ActionRow row && row.getComponents().stream().anyMatch(kind)) {
+                found.add(row);
+            }
+        }
+        return found;
     }
 }
