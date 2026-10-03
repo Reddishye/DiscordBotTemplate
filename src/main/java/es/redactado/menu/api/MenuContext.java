@@ -1,5 +1,6 @@
 package es.redactado.menu.api;
 
+import es.redactado.menu.preset.Preset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -155,6 +156,30 @@ public interface MenuContext {
      *     message
      */
     OptionalLong messageId();
+
+    /**
+     * The look this interaction renders with.
+     *
+     * <p>Resolved once per interaction by the router and carried on the context, so
+     * every component in one render reads the same values. A component that read the
+     * registry itself could see a preset change halfway through a render and produce a
+     * menu whose header came from one look and whose buttons came from another.
+     *
+     * @return the active preset, never null
+     */
+    Preset preset();
+
+    /**
+     * A copy of this context that renders with a different preset.
+     *
+     * <p>Shares the event, the session and the parameters, because only the look
+     * changes: navigation moves to another view of the same message, so the session and
+     * the interaction that is still in flight must be the same objects.
+     *
+     * @param preset the preset to render with
+     * @return a context identical to this one except for the preset
+     */
+    MenuContext withPreset(Preset preset);
 
     /**
      * The locale this interaction is answered in.

@@ -1,6 +1,8 @@
 package es.redactado.menu.core;
 
 import es.redactado.menu.api.Menu;
+import es.redactado.menu.preset.InMemoryPresetPreferences;
+import es.redactado.menu.preset.PresetRegistry;
 
 /**
  * Builds routers for tests, with fakes where a test does not care and real components
@@ -31,6 +33,16 @@ final class TestRouters {
     /** A router that keeps navigation history in the supplied store. */
     static MenuRouter withSessions(SessionStore sessions) {
         return MenuRouter.builder().sessions(sessions).build();
+    }
+
+    /**
+     * A resolver over a fresh registry with no persisted preferences.
+     *
+     * <p>Tests that do not care about presets use this so they see the built-in default
+     * rather than having to know what it is.
+     */
+    static PresetResolver resolver() {
+        return new PresetResolver(new PresetRegistry(), new InMemoryPresetPreferences(), false);
     }
 
     /** A router that resolves presets through the supplied resolver. */

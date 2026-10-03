@@ -20,6 +20,7 @@ import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.Render;
 import es.redactado.menu.api.UserFacingException;
+import es.redactado.menu.preset.BuiltinPresets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -417,8 +418,9 @@ class MenuRouterDispatchTest {
                     JdaMocks.button("menu:m:go", false),
                     new ComponentId("m", "go", params),
                     store,
-                    new Navigator(id -> null, store, Messages.standard()),
-                    Messages.standard());
+                    new Navigator(id -> null, store, Messages.standard(), TestRouters.resolver()),
+                    Messages.standard(),
+                    BuiltinPresets.DEFAULT);
         }
     }
 }

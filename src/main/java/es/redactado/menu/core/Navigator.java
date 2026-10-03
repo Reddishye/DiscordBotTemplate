@@ -6,6 +6,7 @@ import es.redactado.menu.api.NavEntry;
 import es.redactado.menu.api.NavigationMode;
 import es.redactado.menu.api.Session;
 import es.redactado.menu.api.UserFacingException;
+import es.redactado.menu.preset.Preset;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -26,11 +27,17 @@ final class Navigator {
     private final Function<String, Menu> lookup;
     private final SessionStore sessions;
     private final Messages messages;
+    private final PresetResolver presets;
 
-    Navigator(Function<String, Menu> lookup, SessionStore sessions, Messages messages) {
+    Navigator(
+            Function<String, Menu> lookup,
+            SessionStore sessions,
+            Messages messages,
+            PresetResolver presets) {
         this.lookup = lookup;
         this.sessions = sessions;
         this.messages = messages;
+        this.presets = presets;
     }
 
     /**
@@ -101,16 +108,51 @@ final class Navigator {
     /**
      * Renders a remembered view and sends it.
      *
-     * <p>The edit happens only once the render future completes, so a view that
-     * loads data asynchronously never leaves the message showing stale content. A
-     * failed render propagates to whoever is handling the interaction rather than
-     * being swallowed here.
+     * <p>The target menu's own preset is resolved first, because the target may declare
+     * a {@code presetName()} and is otherwise a different menu with different rules.
+     * Rendering the target with whatever look the current menu was using would show one
+     * menu in another's colours, and going back would have to undo it.
+     *
+     * <p>The edit happens only once the render future completes, so a view that loads
+     * data asynchronously never leaves the message showing stale content. A failed
+     * render propagates to whoever is handling the interaction rather than being
+     * swallowed here.
      *
      * @return a future completing when the edit is sent
      */
     private CompletableFuture<Void> show(MenuContext ctx, NavEntry entry) {
         Menu menu = lookupMenu(entry.menuId());
-        return menu.render(ctx.at(entry))
-                .thenCompose(container -> ViewEditor.edit(ctx.event().getHook(), container));
+        return resolveFor(ctx, menu)
+                .thenCompose(
+                        preset ->
+                                menu.render(ctx.at(entry).withPreset(preset))
+                                        .thenCompose(
+                                                container ->
+                                                        ViewEditor.edit(
+                                                                ctx.event().getHook(), container)));
+    }
+
+    /**
+     * Resolves the preset for a menu within an interaction already in flight.
+     *
+     * <p>Uses the same resolver and the same identifiers the router used, so a menu's
+     * own declaration wins and a guild or user preference is honoured exactly as it was
+     * on the way in.
+     */
+    private CompletableFuture<Preset> resolveFor(MenuContext ctx, Menu menu) {
+        long guildId = idOf(ctx.guildId());
+        return presets.resolve(menu, guildId, idOf(ctx.userId()));
+    }
+
+    /** A snowflake as a number, with an absent or unparseable value meaning none. */
+    private static long idOf(String id) {
+        if (id == null || id.isEmpty()) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(id);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
     }
 }

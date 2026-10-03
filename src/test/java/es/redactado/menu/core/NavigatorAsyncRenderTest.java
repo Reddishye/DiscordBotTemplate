@@ -15,6 +15,7 @@ import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.NavEntry;
 import es.redactado.menu.api.NavigationMode;
 import es.redactado.menu.api.Render;
+import es.redactado.menu.preset.BuiltinPresets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -47,7 +48,7 @@ class NavigatorAsyncRenderTest {
     }
 
     private Navigator navigator(Menu target) {
-        return new Navigator(id -> target, sessions, Messages.standard());
+        return new Navigator(id -> target, sessions, Messages.standard(), TestRouters.resolver());
     }
 
     private static Menu menuRendering(CompletableFuture<Container> pending) {
@@ -64,7 +65,8 @@ class NavigatorAsyncRenderTest {
                 new ComponentId("a", "nav", List.of("push", "b")),
                 sessions,
                 navigator(null),
-                Messages.standard());
+                Messages.standard(),
+                BuiltinPresets.DEFAULT);
     }
 
     @Test
@@ -212,7 +214,8 @@ class NavigatorAsyncRenderTest {
                         new ComponentId("b", "nav", List.of("back")),
                         sessions,
                         navigator(target),
-                        Messages.standard());
+                        Messages.standard(),
+                        BuiltinPresets.DEFAULT);
 
         navigator(target).go(backContext, NavigationMode.BACK, "");
 
@@ -228,7 +231,8 @@ class NavigatorAsyncRenderTest {
                             throw new es.redactado.menu.api.MenuNotFoundException(id);
                         },
                         sessions,
-                        Messages.standard());
+                        Messages.standard(),
+                        TestRouters.resolver());
         ButtonInteractionEvent event =
                 JdaMocks.button("menu:a:nav:push:absent", true, MESSAGE, CLICKER);
         MenuContext ctx =
@@ -237,7 +241,8 @@ class NavigatorAsyncRenderTest {
                         new ComponentId("a", "nav", List.of("push", "absent")),
                         sessions,
                         broken,
-                        Messages.standard());
+                        Messages.standard(),
+                        BuiltinPresets.DEFAULT);
 
         assertThatThrownBy(() -> broken.go(ctx, NavigationMode.PUSH, "absent"))
                 .isInstanceOf(es.redactado.menu.api.UserFacingException.class)

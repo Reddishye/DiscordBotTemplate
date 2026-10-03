@@ -17,6 +17,7 @@ import es.redactado.menu.api.NavigationMode;
 import es.redactado.menu.api.Render;
 import es.redactado.menu.api.Session;
 import es.redactado.menu.api.UserFacingException;
+import es.redactado.menu.preset.BuiltinPresets;
 import java.util.List;
 import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.components.container.Container;
@@ -95,7 +96,9 @@ class NavigatorTest {
 
     private Navigator navigator() {
         if (navigator == null) {
-            navigator = new Navigator(this::resolve, sessions, Messages.standard());
+            navigator =
+                    new Navigator(
+                            this::resolve, sessions, Messages.standard(), TestRouters.resolver());
         }
         return navigator;
     }
@@ -106,7 +109,8 @@ class NavigatorTest {
                 new ComponentId(menuId, action, List.of()),
                 sessions,
                 navigator(),
-                Messages.standard());
+                Messages.standard(),
+                BuiltinPresets.DEFAULT);
     }
 
     private ButtonInteractionEvent click(String componentId) {
@@ -273,7 +277,8 @@ class NavigatorTest {
                         new ComponentId("a", "home", List.of()),
                         sessions,
                         navigator(),
-                        Messages.standard());
+                        Messages.standard(),
+                        BuiltinPresets.DEFAULT);
 
         assertThat(ctx.messageId()).isEmpty();
         assertThat(ctx.findSession()).isEmpty();

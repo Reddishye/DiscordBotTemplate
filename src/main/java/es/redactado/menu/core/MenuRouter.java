@@ -8,6 +8,7 @@ import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.MenuNotFoundException;
 import es.redactado.menu.api.ModalAction;
 import es.redactado.menu.preset.InMemoryPresetPreferences;
+import es.redactado.menu.preset.Preset;
 import es.redactado.menu.preset.PresetRegistry;
 import java.util.Locale;
 import java.util.Map;
@@ -76,7 +77,7 @@ public final class MenuRouter implements AutoCloseable {
         this.presets = presets;
         this.ownsExecutor = ownsExecutor;
         this.ownsSessions = ownsSessions;
-        this.navigator = new Navigator(this::get, sessions, messages);
+        this.navigator = new Navigator(this::get, sessions, messages, presets);
     }
 
     /**
@@ -303,13 +304,22 @@ public final class MenuRouter implements AutoCloseable {
                 event,
                 messageId,
                 parsed.get(),
+                registered.menu(),
                 () ->
-                        action.get()
-                                .handler()
-                                .handle(
-                                        BaseContext.fromButton(
-                                                event, parsed.get(), sessions, navigator, messages),
-                                        event));
+                        resolve(event, registered.menu())
+                                .thenApply(
+                                        preset ->
+                                                action.get()
+                                                        .handler()
+                                                        .handle(
+                                                                BaseContext.fromButton(
+                                                                        event,
+                                                                        parsed.get(),
+                                                                        sessions,
+                                                                        navigator,
+                                                                        messages,
+                                                                        preset),
+                                                                event)));
         return true;
     }
 
@@ -352,13 +362,22 @@ public final class MenuRouter implements AutoCloseable {
                 event,
                 messageId,
                 parsed.get(),
+                registered.menu(),
                 () ->
-                        action.get()
-                                .handler()
-                                .handle(
-                                        BaseContext.fromModal(
-                                                event, parsed.get(), sessions, navigator, messages),
-                                        event));
+                        resolve(event, registered.menu())
+                                .thenApply(
+                                        preset ->
+                                                action.get()
+                                                        .handler()
+                                                        .handle(
+                                                                BaseContext.fromModal(
+                                                                        event,
+                                                                        parsed.get(),
+                                                                        sessions,
+                                                                        navigator,
+                                                                        messages,
+                                                                        preset),
+                                                                event)));
         return true;
     }
 
@@ -431,7 +450,8 @@ public final class MenuRouter implements AutoCloseable {
             IReplyCallback event,
             long messageId,
             ComponentId id,
-            Supplier<CompletableFuture<Void>> work) {
+            Menu menu,
+            Supplier<CompletableFuture<CompletableFuture<Void>>> work) {
         AtomicBoolean released = new AtomicBoolean();
         Runnable release = () -> releaseOnce(messageId, released);
         try {
@@ -439,6 +459,7 @@ public final class MenuRouter implements AutoCloseable {
                     () -> {
                         try {
                             work.get()
+                                    .thenCompose(inner -> inner)
                                     .whenComplete(
                                             (ignored, error) -> {
                                                 if (error != null) {
@@ -506,6 +527,22 @@ public final class MenuRouter implements AutoCloseable {
      */
     int inFlight() {
         return guard.size();
+    }
+
+    /**
+     * Finds the preset for this interaction.
+     *
+     * <p>A direct message reports guild id {@code 0}, which is how the resolver knows to
+     * skip the guild level: a DM has no guild, and asking about one would be asking
+     * about the absence of something.
+     *
+     * <p>The resolver never fails, so there is no error path here. If it somehow did,
+     * the exception would reach the same error handling as a handler failure and the
+     * user would get the generic message rather than silence.
+     */
+    private CompletableFuture<Preset> resolve(IReplyCallback event, Menu menu) {
+        long guildId = event.getGuild() == null ? 0L : event.getGuild().getIdLong();
+        return presets.resolve(menu, guildId, event.getUser().getIdLong());
     }
 
     /** The locale of the interacting user, or the guild's, or English. */

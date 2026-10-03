@@ -5,6 +5,7 @@ import es.redactado.menu.api.NavEntry;
 import es.redactado.menu.api.NavigationMode;
 import es.redactado.menu.api.Session;
 import es.redactado.menu.api.UserFacingException;
+import es.redactado.menu.preset.Preset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -49,6 +50,7 @@ public final class BaseContext implements MenuContext {
     private final Navigator navigator;
     private final Messages messages;
     private final Locale locale;
+    private final Preset preset;
 
     private BaseContext(
             String menuId,
@@ -63,7 +65,8 @@ public final class BaseContext implements MenuContext {
             OptionalLong messageId,
             SessionStore sessions,
             Navigator navigator,
-            Messages messages) {
+            Messages messages,
+            Preset preset) {
         this.menuId = menuId;
         this.action = action;
         this.params = params;
@@ -80,6 +83,7 @@ public final class BaseContext implements MenuContext {
         // Resolved once: every part of one render must agree on the language, and no
         // lookup should happen per message.
         this.locale = Locales.resolve(event.getUserLocale(), guildLocale(event));
+        this.preset = preset;
     }
 
     /**
@@ -96,8 +100,9 @@ public final class BaseContext implements MenuContext {
             ComponentId parsed,
             SessionStore sessions,
             Navigator navigator,
-            Messages messages) {
-        return from(event, parsed, sessions, navigator, messages);
+            Messages messages,
+            Preset preset) {
+        return from(event, parsed, sessions, navigator, messages, preset);
     }
 
     /**
@@ -114,8 +119,9 @@ public final class BaseContext implements MenuContext {
             ComponentId parsed,
             SessionStore sessions,
             Navigator navigator,
-            Messages messages) {
-        return from(event, parsed, sessions, navigator, messages);
+            Messages messages,
+            Preset preset) {
+        return from(event, parsed, sessions, navigator, messages, preset);
     }
 
     private static MenuContext from(
@@ -123,7 +129,8 @@ public final class BaseContext implements MenuContext {
             ComponentId parsed,
             SessionStore sessions,
             Navigator navigator,
-            Messages messages) {
+            Messages messages,
+            Preset preset) {
         Message message =
                 event instanceof ButtonInteractionEvent button
                         ? button.getMessage()
@@ -145,7 +152,8 @@ public final class BaseContext implements MenuContext {
                 messageId,
                 sessions,
                 navigator,
-                messages);
+                messages,
+                preset);
     }
 
     /**
@@ -161,6 +169,18 @@ public final class BaseContext implements MenuContext {
     @Override
     public Locale locale() {
         return locale;
+    }
+
+    @Override
+    public Preset preset() {
+        return preset;
+    }
+
+    @Override
+    public MenuContext withPreset(Preset preset) {
+        return new BaseContext(
+                menuId, action, params, user, guild, member, channelId, thread, event, messageId,
+                sessions, navigator, messages, preset);
     }
 
     @Override
@@ -320,6 +340,7 @@ public final class BaseContext implements MenuContext {
                 messageId,
                 sessions,
                 navigator,
-                messages);
+                messages,
+                preset);
     }
 }
