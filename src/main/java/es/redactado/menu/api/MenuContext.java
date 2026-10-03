@@ -1,6 +1,7 @@
 package es.redactado.menu.api;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
@@ -154,6 +155,29 @@ public interface MenuContext {
      *     message
      */
     OptionalLong messageId();
+
+    /**
+     * The locale this interaction is answered in.
+     *
+     * <p>Resolved once when the context was built, from the user's own Discord setting
+     * where there is one and the guild's otherwise, so every part of a render agrees on
+     * the language and no lookup happens per message.
+     *
+     * @return the locale to answer in, never null
+     */
+    Locale locale();
+
+    /**
+     * Resolves a user-facing message for {@link #locale()}.
+     *
+     * <p>The convenience a component needs to render text without holding a
+     * {@code Messages} of its own.
+     *
+     * @param key a key declared in {@code MessageKeys}
+     * @param args values for the {@code {n}} placeholders in that message
+     * @return the translated text
+     */
+    String t(String key, Object... args);
 
     /**
      * The session for this message, created on first use.

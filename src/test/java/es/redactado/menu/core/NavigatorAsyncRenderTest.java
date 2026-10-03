@@ -47,7 +47,7 @@ class NavigatorAsyncRenderTest {
     }
 
     private Navigator navigator(Menu target) {
-        return new Navigator(id -> target, sessions);
+        return new Navigator(id -> target, sessions, Messages.standard());
     }
 
     private static Menu menuRendering(CompletableFuture<Container> pending) {
@@ -63,7 +63,8 @@ class NavigatorAsyncRenderTest {
                 event,
                 new ComponentId("a", "nav", List.of("push", "b")),
                 sessions,
-                navigator(null));
+                navigator(null),
+                Messages.standard());
     }
 
     @Test
@@ -211,7 +212,8 @@ class NavigatorAsyncRenderTest {
                         backEvent,
                         new ComponentId("b", "nav", List.of("back")),
                         sessions,
-                        navigator(target));
+                        navigator(target),
+                        Messages.standard());
 
         navigator(target).go(backContext, NavigationMode.BACK, "");
 
@@ -226,7 +228,8 @@ class NavigatorAsyncRenderTest {
                         id -> {
                             throw new es.redactado.menu.api.MenuNotFoundException(id);
                         },
-                        sessions);
+                        sessions,
+                        Messages.standard());
         ButtonInteractionEvent event =
                 JdaMocks.button("menu:a:nav:push:absent", true, MESSAGE, CLICKER);
         MenuContext ctx =
@@ -234,11 +237,12 @@ class NavigatorAsyncRenderTest {
                         event,
                         new ComponentId("a", "nav", List.of("push", "absent")),
                         sessions,
-                        broken);
+                        broken,
+                        Messages.standard());
 
         assertThatThrownBy(() -> broken.go(ctx, NavigationMode.PUSH, "absent"))
                 .isInstanceOf(es.redactado.menu.api.UserFacingException.class)
-                .hasMessage("Unknown menu.");
+                .hasMessage(MessageKeys.ERROR_UNKNOWN_MENU);
         verify(event.getHook(), never()).sendMessage(anyString());
     }
 

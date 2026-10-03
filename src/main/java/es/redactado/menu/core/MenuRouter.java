@@ -7,6 +7,7 @@ import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.MenuNotFoundException;
 import es.redactado.menu.api.ModalAction;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -19,6 +20,7 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.interactions.DiscordLocale;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,12 +48,10 @@ public final class MenuRouter implements AutoCloseable {
     /** Sentinel for an interaction with no menu message, such as a bare modal. */
     private static final long NO_MESSAGE = -1L;
 
-    private static final String NOT_YOURS = "This menu is not yours.";
-    private static final String BUSY = "The bot is busy. Try again.";
-
     private final Map<String, Registered> menus = new ConcurrentHashMap<>();
     private final MenuExecutor executor;
     private final SessionStore sessions;
+    private final Messages messages;
     private final InteractionGuard guard = new InteractionGuard();
     private final Navigator navigator;
 
@@ -59,16 +59,29 @@ public final class MenuRouter implements AutoCloseable {
     private record Registered(Menu menu, ActionTable table) {}
 
     /**
-     * Creates a router that runs handlers on the given executor and keeps
-     * navigation history in the given store.
+     * Creates a router that runs handlers on the given executor, keeps navigation
+     * history in the given store, and answers in the bundles shipped with the
+     * template.
      *
      * @param executor the executor that runs handler bodies
      * @param sessions the store holding one session per menu message
      */
     public MenuRouter(MenuExecutor executor, SessionStore sessions) {
+        this(executor, sessions, Messages.standard());
+    }
+
+    /**
+     * Creates a router with a specific set of bundles.
+     *
+     * @param executor the executor that runs handler bodies
+     * @param sessions the store holding one session per menu message
+     * @param messages where user-facing text is resolved from
+     */
+    public MenuRouter(MenuExecutor executor, SessionStore sessions, Messages messages) {
         this.executor = executor;
         this.sessions = sessions;
-        this.navigator = new Navigator(this::get, sessions);
+        this.messages = messages;
+        this.navigator = new Navigator(this::get, sessions, messages);
     }
 
     /**
@@ -174,7 +187,7 @@ public final class MenuRouter implements AutoCloseable {
                     "Menu '{}' has no button action '{}'",
                     parsed.get().menuId(),
                     parsed.get().action());
-            Replies.ephemeral(event, Replies.UNKNOWN_ACTION);
+            Replies.ephemeral(event, messages, localeOf(event), MessageKeys.ERROR_UNKNOWN_ACTION);
             return true;
         }
 
@@ -194,7 +207,7 @@ public final class MenuRouter implements AutoCloseable {
                                 .handler()
                                 .handle(
                                         BaseContext.fromButton(
-                                                event, parsed.get(), sessions, navigator),
+                                                event, parsed.get(), sessions, navigator, messages),
                                         event));
         return true;
     }
@@ -223,7 +236,7 @@ public final class MenuRouter implements AutoCloseable {
                     "Menu '{}' has no modal action '{}'",
                     parsed.get().menuId(),
                     parsed.get().action());
-            Replies.ephemeral(event, Replies.UNKNOWN_ACTION);
+            Replies.ephemeral(event, messages, localeOf(event), MessageKeys.ERROR_UNKNOWN_ACTION);
             return true;
         }
 
@@ -243,7 +256,7 @@ public final class MenuRouter implements AutoCloseable {
                                 .handler()
                                 .handle(
                                         BaseContext.fromModal(
-                                                event, parsed.get(), sessions, navigator),
+                                                event, parsed.get(), sessions, navigator, messages),
                                         event));
         return true;
     }
@@ -259,7 +272,7 @@ public final class MenuRouter implements AutoCloseable {
      */
     private boolean admit(Menu menu, IReplyCallback event, long messageId) {
         if (!owns(menu, messageId(event), event)) {
-            Replies.ephemeral(event, NOT_YOURS);
+            Replies.ephemeral(event, messages, localeOf(event), MessageKeys.ERROR_NOT_OWNER);
             return false;
         }
         if (messageId != NO_MESSAGE && !guard.tryAcquire(messageId)) {
@@ -329,7 +342,12 @@ public final class MenuRouter implements AutoCloseable {
                                             (ignored, error) -> {
                                                 if (error != null) {
                                                     ErrorReply.send(
-                                                            event, error, id.menuId(), id.action());
+                                                            event,
+                                                            messages,
+                                                            localeOf(event),
+                                                            error,
+                                                            id.menuId(),
+                                                            id.action());
                                                 }
                                                 release.run();
                                             });
@@ -337,14 +355,20 @@ public final class MenuRouter implements AutoCloseable {
                             // The only broad catch in the menu package, permitted
                             // solely in the dispatcher. A handler that throws before
                             // returning a future never produces one to observe.
-                            ErrorReply.send(event, error, id.menuId(), id.action());
+                            ErrorReply.send(
+                                    event,
+                                    messages,
+                                    localeOf(event),
+                                    error,
+                                    id.menuId(),
+                                    id.action());
                             release.run();
                         }
                     });
         } catch (RejectedExecutionException error) {
             LOG.warn("Executor rejected action '{}' of menu '{}'", id.action(), id.menuId(), error);
             release.run();
-            Replies.ephemeral(event, BUSY);
+            Replies.ephemeral(event, messages, localeOf(event), MessageKeys.ERROR_BUSY);
         }
     }
 
@@ -381,6 +405,13 @@ public final class MenuRouter implements AutoCloseable {
      */
     int inFlight() {
         return guard.size();
+    }
+
+    /** The locale of the interacting user, or the guild's, or English. */
+    private static Locale localeOf(IReplyCallback event) {
+        return Locales.resolve(
+                event.getUserLocale(),
+                event.getGuild() == null ? DiscordLocale.UNKNOWN : event.getGuildLocale());
     }
 
     @Override

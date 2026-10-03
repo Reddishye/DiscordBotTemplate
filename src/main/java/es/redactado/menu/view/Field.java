@@ -65,10 +65,18 @@ public class Field implements MenuComponent {
         return List.of(
                 Section.of(
                         accessory.render(ctx),
-                        TextDisplay.of("**%s:** %s".formatted(label, safeValue()))));
+                        TextDisplay.of("**%s:** %s".formatted(label, safeValue(ctx)))));
     }
 
-    private String safeValue() {
-        return value != null && !value.isBlank() ? value : "*Not set*";
+    /**
+     * The value, or a localized stand-in when there is none.
+     *
+     * <p>Resolved from the context so a menu shown to a Spanish speaker says
+     * "Sin definir" rather than the English default.
+     */
+    private String safeValue(MenuContext ctx) {
+        return value != null && !value.isBlank()
+                ? value
+                : ctx.t(es.redactado.menu.core.MessageKeys.FIELD_NOT_SET);
     }
 }

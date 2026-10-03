@@ -7,6 +7,7 @@ import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.Render;
 import es.redactado.menu.api.UserFacingException;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.dv8tion.jda.api.components.container.Container;
@@ -121,7 +122,16 @@ class AbstractMenuViewTest {
 
         Throwable error = failureOf(future);
         assertThat(error).isInstanceOf(UserFacingException.class);
-        assertThat(error).hasMessage("Loading took too long.");
+        assertThat(error)
+                .hasMessage(MessageKeys.ERROR_LOAD_TIMEOUT)
+                .satisfies(
+                        e ->
+                                assertThat(
+                                                Messages.standard()
+                                                        .get(
+                                                                Locale.ENGLISH,
+                                                                MessageKeys.ERROR_LOAD_TIMEOUT))
+                                        .isEqualTo("Loading took too long."));
     }
 
     @Test

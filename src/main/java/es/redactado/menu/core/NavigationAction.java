@@ -24,7 +24,7 @@ public record NavigationAction(NavigationMode mode, String targetMenuId) {
         try {
             mode = NavigationMode.valueOf(raw.toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new UserFacingException("Unknown navigation mode.");
+            throw new UserFacingException(MessageKeys.ERROR_UNKNOWN_NAV_MODE);
         }
         String target = ctx.param(1).orElse("");
         return new NavigationAction(mode, target);

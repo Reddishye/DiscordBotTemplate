@@ -46,7 +46,7 @@ public class SectionList<T> implements MenuComponent {
     public List<ContainerChildComponent> render(MenuContext ctx) {
         var result = new ArrayList<ContainerChildComponent>();
         if (items.isEmpty()) {
-            result.add(TextDisplay.of("*No items.*"));
+            result.add(TextDisplay.of(ctx.t(es.redactado.menu.core.MessageKeys.LIST_EMPTY)));
             return result;
         }
 

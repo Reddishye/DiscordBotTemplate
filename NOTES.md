@@ -803,6 +803,85 @@ The lesson worth keeping: a class whose static initialiser builds instances of
 another class that refers back to it will fail in a way that looks like a null
 pointer rather than an initialisation problem.
 
+### JDA 6.4.2 has no user locale on `User`, and the package is not where it looks
+
+Two things in the T9 brief did not match the library, both checked against the 6.4.2
+sources jar rather than assumed:
+
+- `DiscordLocale` is in `net.dv8tion.jda.api.interactions`, not in an
+  `interactions.locales` subpackage.
+- **There is no `User.getLocale()`.** A user's locale is only reachable through the
+  interaction: `Interaction.getUserLocale()`, which `IReplyCallback` inherits because
+  `IDeferrableCallback extends Interaction`. Reading it off the `User` would not
+  compile, so `BaseContext` reads it from the event.
+
+`Interaction.getGuildLocale()` is a default method that delegates to
+`getGuild().getLocale()`, which throws in a direct message. Every call site therefore
+checks `getGuild() != null` first and passes `DiscordLocale.UNKNOWN` otherwise. A
+direct message with no guild is an ordinary case, not an edge case, and the obvious
+implementation crashes on it.
+
+### `MessageFormat` was rejected for argument substitution
+
+`String.formatted` does not substitute `{0}`; it is a `Formatter`, so it wants `%s`. That
+mattered concretely: a test that asserted the generic error message by calling
+`.formatted(reference)` on the template silently compared the unsubstituted template and
+failed, rather than substituting.
+
+More importantly, `MessageFormat` treats a single quote as an escape character, so a
+Spanish or French translation containing an apostrophe renders wrong unless its author
+knows to double every one of them. `Messages.substitute` is a small hand-written
+`StringBuilder` loop instead: no escaping rules for a translator to get wrong, and no
+pattern parsing for a message that is mostly prose.
+
+`substitute` is package-private purely so its rules can be tested against a
+two-placeholder template. No shipped message has two placeholders, and adding a fake one
+would put text in front of users that exists only to be tested.
+
+### AssertJ's `anySatisfy` means "every", not "some"
+
+A test asserting that at least one Spanish message contained `ñ` used `anySatisfy`, which
+AssertJ defines as *every* element satisfying the condition. It failed for the right
+reason and the wrong message: there is no `ñ` in the Spanish copy, because "menú" has a
+`ú`. The `ñ` assertion was removed rather than satisfied by inventing a message
+containing one.
+
+### The encoding test is only meaningful because Java sources must be ASCII
+
+`AsciiSourcesTest` keeps every Java source below 0x80, so the expected Spanish strings in
+`MessageKeysTest` are written as `\u00FA` escapes. That is what makes the test a real
+check rather than a tautology: the expected values are built from ASCII source and carry
+real accented characters, so they match only if the properties file was decoded as
+UTF-8. Reading it as ISO-8859-1 would yield different code points and the equalities
+would fail. Writing the literals as accented characters in the test source would have
+made the test assert that a file is identical to itself.
+
+### The literal scan cannot see the main reply path, and that is recorded in a test
+
+`NoHardcodedUserTextTest` flags an English literal in the first argument position of
+`ephemeral(`, `reply(`, `TextDisplay.of(` and friends. `Replies.ephemeral` takes the
+event first and the text second, so a literal there is not in the position the scan
+inspects, and **every** user-facing reply in the package travels through that method.
+
+Rather than widen the rule to any argument position, which would also flag format strings
+and developer-facing text and turn the scan into noise, the gap is asserted by
+`knownGapIsReal()` and documented in the test's Javadoc. A known gap that a test pins
+down is recoverable; one that is quietly forgotten is not.
+
+Two more blind spots, listed in that Javadoc: a literal starting with markdown or an emoji
+(`"*Not set*"`) is not matched because the first character is not a letter, and a literal
+arriving through a constant or a local variable is not in argument position at all. All
+three occurred during T9 and were localized anyway.
+
+### Developer-facing text was deliberately not translated
+
+`Validator` messages, every `LOG` line, and the text of `IllegalArgumentException` and
+`IllegalStateException` stay English literals. They go to logs, stack traces and
+`IllegalArgumentException` messages, never to a Discord user, and translating them would
+mean a bot operator reading a stack trace in a language they did not choose. The scan is
+scoped to the menu package and to user-facing call sites so this distinction is enforced
+rather than assumed.
+
 ### `PresetLoader` uses the tree model, not data binding, for three reasons
 
 Data binding was rejected on purpose. Each of the three behaviours the format needs is

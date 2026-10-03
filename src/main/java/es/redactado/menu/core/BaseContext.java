@@ -6,6 +6,7 @@ import es.redactado.menu.api.NavigationMode;
 import es.redactado.menu.api.Session;
 import es.redactado.menu.api.UserFacingException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +18,7 @@ import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.interactions.DiscordLocale;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 
@@ -31,7 +33,6 @@ import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
  */
 public final class BaseContext implements MenuContext {
 
-    private static final String INVALID_PARAM_TEXT = "Invalid or missing parameter.";
     private static final Supplier<UserFacingException> INVALID_PARAM = BaseContext::invalidParam;
 
     private final String menuId;
@@ -46,6 +47,8 @@ public final class BaseContext implements MenuContext {
     private final OptionalLong messageId;
     private final SessionStore sessions;
     private final Navigator navigator;
+    private final Messages messages;
+    private final Locale locale;
 
     private BaseContext(
             String menuId,
@@ -59,7 +62,8 @@ public final class BaseContext implements MenuContext {
             IReplyCallback event,
             OptionalLong messageId,
             SessionStore sessions,
-            Navigator navigator) {
+            Navigator navigator,
+            Messages messages) {
         this.menuId = menuId;
         this.action = action;
         this.params = params;
@@ -72,6 +76,10 @@ public final class BaseContext implements MenuContext {
         this.messageId = messageId;
         this.sessions = sessions;
         this.navigator = navigator;
+        this.messages = messages;
+        // Resolved once: every part of one render must agree on the language, and no
+        // lookup should happen per message.
+        this.locale = Locales.resolve(event.getUserLocale(), guildLocale(event));
     }
 
     /**
@@ -87,8 +95,9 @@ public final class BaseContext implements MenuContext {
             ButtonInteractionEvent event,
             ComponentId parsed,
             SessionStore sessions,
-            Navigator navigator) {
-        return from(event, parsed, sessions, navigator);
+            Navigator navigator,
+            Messages messages) {
+        return from(event, parsed, sessions, navigator, messages);
     }
 
     /**
@@ -104,12 +113,17 @@ public final class BaseContext implements MenuContext {
             ModalInteractionEvent event,
             ComponentId parsed,
             SessionStore sessions,
-            Navigator navigator) {
-        return from(event, parsed, sessions, navigator);
+            Navigator navigator,
+            Messages messages) {
+        return from(event, parsed, sessions, navigator, messages);
     }
 
     private static MenuContext from(
-            IReplyCallback event, ComponentId parsed, SessionStore sessions, Navigator navigator) {
+            IReplyCallback event,
+            ComponentId parsed,
+            SessionStore sessions,
+            Navigator navigator,
+            Messages messages) {
         Message message =
                 event instanceof ButtonInteractionEvent button
                         ? button.getMessage()
@@ -130,7 +144,28 @@ public final class BaseContext implements MenuContext {
                 event,
                 messageId,
                 sessions,
-                navigator);
+                navigator,
+                messages);
+    }
+
+    /**
+     * The guild's locale, or unknown in a direct message.
+     *
+     * <p>{@code getGuildLocale()} delegates to {@code getGuild().getLocale()}, which
+     * throws when there is no guild, so the check has to happen here.
+     */
+    private static DiscordLocale guildLocale(IReplyCallback event) {
+        return event.getGuild() == null ? DiscordLocale.UNKNOWN : event.getGuildLocale();
+    }
+
+    @Override
+    public Locale locale() {
+        return locale;
+    }
+
+    @Override
+    public String t(String key, Object... args) {
+        return messages.get(locale, key, args);
     }
 
     @Override
@@ -179,7 +214,7 @@ public final class BaseContext implements MenuContext {
     }
 
     private static UserFacingException invalidParam() {
-        return new UserFacingException(INVALID_PARAM_TEXT);
+        return new UserFacingException(MessageKeys.ERROR_BAD_PARAM);
     }
 
     @Override
@@ -284,6 +319,7 @@ public final class BaseContext implements MenuContext {
                 event,
                 messageId,
                 sessions,
-                navigator);
+                navigator,
+                messages);
     }
 }

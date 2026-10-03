@@ -1,5 +1,6 @@
 package es.redactado.menu.core;
 
+import java.util.Locale;
 import java.util.Objects;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 
@@ -13,15 +14,13 @@ import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
  */
 final class Replies {
 
-    static final String UNKNOWN_ACTION = "Unknown action.";
-
     private Replies() {}
 
     /**
      * Sends an ephemeral message, choosing the route that is still legal.
      *
      * @param event the interaction that triggered the message
-     * @param text the message text
+     * @param text the message text, already localized
      */
     static void ephemeral(IReplyCallback event, String text) {
         Objects.requireNonNull(event, "event");
@@ -30,5 +29,17 @@ final class Replies {
         } else {
             event.reply(text).setEphemeral(true).queue();
         }
+    }
+
+    /**
+     * Resolves a message for the interaction's locale and sends it ephemerally.
+     *
+     * @param event the interaction that triggered the message
+     * @param messages where the text is resolved from
+     * @param locale the locale of the person being answered
+     * @param key a key declared in {@link MessageKeys}
+     */
+    static void ephemeral(IReplyCallback event, Messages messages, Locale locale, String key) {
+        ephemeral(event, messages.get(locale, key));
     }
 }

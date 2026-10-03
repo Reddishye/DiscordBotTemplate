@@ -387,7 +387,7 @@ class MenuRouterDispatchTest {
         void rejectsMalformed() {
             assertThatThrownBy(() -> contextWith("4x2").requireLong(0))
                     .isInstanceOf(UserFacingException.class)
-                    .hasMessage("Invalid or missing parameter.");
+                    .hasMessage(MessageKeys.ERROR_BAD_PARAM);
         }
 
         @Test
@@ -420,7 +420,8 @@ class MenuRouterDispatchTest {
                     JdaMocks.button("menu:m:go", false),
                     new ComponentId("m", "go", params),
                     store,
-                    new Navigator(id -> null, store));
+                    new Navigator(id -> null, store, Messages.standard()),
+                    Messages.standard());
         }
     }
 }

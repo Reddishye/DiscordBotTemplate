@@ -95,14 +95,18 @@ class NavigatorTest {
 
     private Navigator navigator() {
         if (navigator == null) {
-            navigator = new Navigator(this::resolve, sessions);
+            navigator = new Navigator(this::resolve, sessions, Messages.standard());
         }
         return navigator;
     }
 
     private MenuContext contextFor(ButtonInteractionEvent event, String menuId, String action) {
         return BaseContext.fromButton(
-                event, new ComponentId(menuId, action, List.of()), sessions, navigator());
+                event,
+                new ComponentId(menuId, action, List.of()),
+                sessions,
+                navigator(),
+                Messages.standard());
     }
 
     private ButtonInteractionEvent click(String componentId) {
@@ -226,7 +230,7 @@ class NavigatorTest {
             org.assertj.core.api.Assertions.assertThatThrownBy(
                             () -> navigator.go(ctx, NavigationMode.PUSH, "absent"))
                     .isInstanceOf(UserFacingException.class)
-                    .hasMessage("Unknown menu.");
+                    .hasMessage(MessageKeys.ERROR_UNKNOWN_MENU);
         }
     }
 
@@ -265,7 +269,11 @@ class NavigatorTest {
         ButtonInteractionEvent event = JdaMocks.button("menu:a:home", true);
         MenuContext ctx =
                 BaseContext.fromButton(
-                        event, new ComponentId("a", "home", List.of()), sessions, navigator());
+                        event,
+                        new ComponentId("a", "home", List.of()),
+                        sessions,
+                        navigator(),
+                        Messages.standard());
 
         assertThat(ctx.messageId()).isEmpty();
         assertThat(ctx.findSession()).isEmpty();

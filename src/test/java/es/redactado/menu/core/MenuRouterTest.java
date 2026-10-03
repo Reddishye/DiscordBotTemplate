@@ -21,6 +21,7 @@ import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.MenuNotFoundException;
 import es.redactado.menu.api.ModalHandler;
 import es.redactado.menu.api.Render;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import net.dv8tion.jda.api.components.container.Container;
@@ -182,7 +183,10 @@ class MenuRouterTest {
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
             verify(event, never()).getHook();
             verify(event, timeout(AWAIT_MS)).reply(captor.capture());
-            assertThat(captor.getValue()).isEqualTo(Replies.UNKNOWN_ACTION);
+            assertThat(captor.getValue())
+                    .isEqualTo(
+                            Messages.standard()
+                                    .get(Locale.ENGLISH, MessageKeys.ERROR_UNKNOWN_ACTION));
         }
 
         @Test
@@ -197,7 +201,10 @@ class MenuRouterTest {
 
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
             verify(event, timeout(AWAIT_MS)).reply(captor.capture());
-            assertThat(captor.getValue()).isEqualTo(Replies.UNKNOWN_ACTION);
+            assertThat(captor.getValue())
+                    .isEqualTo(
+                            Messages.standard()
+                                    .get(Locale.ENGLISH, MessageKeys.ERROR_UNKNOWN_ACTION));
         }
 
         @Test

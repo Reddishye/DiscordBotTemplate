@@ -54,14 +54,15 @@ public final class PresetResolver {
     /**
      * Creates a resolver with an explicit continuation executor.
      *
-     * <p>Only for tests and for a bot that wants the rest of the chain on its own pool.
+     * <p>Package-private because it exists to make the lookup order observable in tests;
+     * a bot uses the three-argument constructor.
      *
      * @param registry where presets are looked up and where the default comes from
      * @param preferences where per-guild and per-user choices come from
      * @param userPresetsEnabled whether a user's own choice may override their guild's
      * @param executor runs the continuation after each preferences lookup
      */
-    public PresetResolver(
+    PresetResolver(
             PresetRegistry registry,
             PresetPreferences preferences,
             boolean userPresetsEnabled,

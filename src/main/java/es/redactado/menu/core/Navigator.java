@@ -22,14 +22,15 @@ import org.slf4j.LoggerFactory;
 final class Navigator {
 
     private static final Logger LOG = LoggerFactory.getLogger(Navigator.class);
-    private static final String EXPIRED = "This menu expired.";
 
     private final Function<String, Menu> lookup;
     private final SessionStore sessions;
+    private final Messages messages;
 
-    Navigator(Function<String, Menu> lookup, SessionStore sessions) {
+    Navigator(Function<String, Menu> lookup, SessionStore sessions, Messages messages) {
         this.lookup = lookup;
         this.sessions = sessions;
+        this.messages = messages;
     }
 
     /**
@@ -62,7 +63,7 @@ final class Navigator {
             // The session expired, so there is no history to honour. Say so rather
             // than pretending the user never navigated, then land them somewhere
             // usable.
-            Replies.ephemeral(ctx.event(), EXPIRED);
+            Replies.ephemeral(ctx.event(), messages, ctx.locale(), MessageKeys.NAV_EXPIRED);
             return show(ctx, currentHome(ctx));
         }
         Optional<NavEntry> previous = existing.get().pop();
@@ -93,7 +94,7 @@ final class Navigator {
             return lookup.apply(menuId);
         } catch (RuntimeException e) {
             LOG.debug("Navigation target '{}' is not a registered menu", menuId);
-            throw new UserFacingException("Unknown menu.");
+            throw new UserFacingException(MessageKeys.ERROR_UNKNOWN_MENU);
         }
     }
 

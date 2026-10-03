@@ -37,7 +37,6 @@ public abstract class AbstractMenu implements Menu {
 
     private static final Logger LOG = LoggerFactory.getLogger(AbstractMenu.class);
     private static final Duration DEFAULT_LOAD_TIMEOUT = Duration.ofSeconds(10);
-    private static final String LOAD_TIMEOUT_MESSAGE = "Loading took too long.";
 
     private static final String UNACKNOWLEDGED =
             "Action must declare an ack mode that acknowledges the interaction";
@@ -111,7 +110,8 @@ public abstract class AbstractMenu implements Menu {
                         error ->
                                 error instanceof TimeoutException
                                         ? CompletableFuture.failedFuture(
-                                                new UserFacingException(LOAD_TIMEOUT_MESSAGE))
+                                                new UserFacingException(
+                                                        MessageKeys.ERROR_LOAD_TIMEOUT))
                                         : CompletableFuture.failedFuture(error))
                 .thenApply(model -> renderer.render(ctx, model));
     }

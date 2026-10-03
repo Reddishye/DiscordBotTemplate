@@ -197,6 +197,38 @@ stops existing is dropped. Reloading can be manual, or automatic: `startWatching
 watches the directory on one daemon thread and reloads once writes have been quiet
 for 300 ms, so a burst of saves is one reload rather than twenty.
 
+## Adding a locale or a key
+
+User-facing text lives in `src/main/resources/menu/messages.properties` (English, the
+default) and `messages_<tag>.properties` for every other locale. Code never spells a
+sentence: it names a constant from `core/MessageKeys` and the text is resolved against
+the interaction's locale.
+
+To change an existing message, edit the value in each bundle.
+
+To add a new message:
+
+1. Add the key to `messages.properties`, with `{0}` style positional placeholders.
+2. Add the same key to every other bundle. `MessageKeysTest.parity` fails the build
+   otherwise, and so does a mismatch in the `{n}` placeholders for one key.
+3. Add a `public static final String` to `MessageKeys`, grouped under the right prefix.
+   The same test fails if a constant has no value, if a bundle key has no constant, and
+   if a constant is never referenced by any other main source.
+4. Use it: `ctx.t(MessageKeys.X)` in a component, or
+   `Replies.ephemeral(event, messages, locale, MessageKeys.X)` from the router.
+
+To add a language:
+
+1. Create `src/main/resources/menu/messages_<tag>.properties`, copying every key from
+   the English bundle. Do not translate it yet if you do not have a translator; an
+   English copy passes parity and is honest about needing review.
+2. Nothing else. `Messages` resolves the exact tag, then the bare language, then
+   English, and caches each language once.
+
+`Locales` picks the user's Discord locale when they have one and the guild's otherwise.
+`DiscordLocale.UNKNOWN`, which Discord reports for most new accounts, falls through to
+English.
+
 `EmojiText` and `DefaultLook` are package-private inside `preset`. `EmojiText`
 exists because JDA does not validate emoji, and `DefaultLook` exists to break a
 class-initialisation cycle between `Preset` and `BuiltinPresets`.

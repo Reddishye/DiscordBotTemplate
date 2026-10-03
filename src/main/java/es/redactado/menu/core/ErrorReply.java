@@ -1,6 +1,7 @@
 package es.redactado.menu.core;
 
 import java.security.SecureRandom;
+import java.util.Locale;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
@@ -27,16 +28,27 @@ final class ErrorReply {
     /**
      * Reports a failure to the user and the log.
      *
+     * <p>The text is resolved here rather than where the failure was raised, because
+     * this is the first point that knows both the cause and the reader.
+     *
      * @param event the interaction that failed
+     * @param messages where the text is resolved from
+     * @param locale the locale of the person being answered
      * @param error the failure, which may be wrapped
      * @param menuId the menu that failed
      * @param action the action that failed
      */
-    static void send(IReplyCallback event, Throwable error, String menuId, String action) {
+    static void send(
+            IReplyCallback event,
+            Messages messages,
+            Locale locale,
+            Throwable error,
+            String menuId,
+            String action) {
         Throwable cause = unwrap(error);
         if (cause instanceof es.redactado.menu.api.UserFacingException userFacing) {
             LOG.debug("Action '{}' of menu '{}' rejected", action, menuId, cause);
-            reply(event, userFacing.getMessage());
+            reply(event, messages.get(locale, userFacing.key(), userFacing.args()));
             return;
         }
 
@@ -49,7 +61,7 @@ final class ErrorReply {
                 guildId(event),
                 userId(event),
                 cause);
-        reply(event, "Something went wrong (ref: %s).".formatted(reference));
+        reply(event, messages.get(locale, MessageKeys.ERROR_GENERIC, reference));
     }
 
     /**
