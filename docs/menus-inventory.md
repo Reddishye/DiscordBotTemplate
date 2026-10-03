@@ -131,8 +131,13 @@ view   ->  api, core
 
 `preset` is a leaf: it holds data about how a menu looks and deliberately imports
 nothing from the rest of the framework, so a preset can be read, tested, and
-serialised on its own. `api`, `core`, and `view` are free to import it; none of them
-does yet, because components start reading presets in T10.
+serialised on its own. `api`, `core`, and `view` all import it, and nothing goes the
+other way.
+
+The chain at run time is: `PresetResolver` picks a preset per interaction,
+`MenuRouter` puts it on the `MenuContext` as `ctx.preset()`, and every component reads
+that one value. `Looks` is the only class that converts a preset into a JDA value, so a
+mapping is changed in one place rather than in every component.
 
 ## Custom preset files
 
@@ -451,7 +456,7 @@ is the final path; the "Name" column is the final type name where it differs.
 | `api/Renderable.java` | `api/Renderable.java` | `Renderable` | unused, removed in T14 |
 | `base/AbstractMenu.java` | `core/AbstractMenu.java` | `AbstractMenu` | **T3** registers the built-in `nav` action; **T5** the nav action delegates to `Navigator` |
 | `base/BaseContext.java` | `core/BaseContext.java` | `BaseContext` | becomes the `MenuContext` implementation in T5 |
-| `builder/MenuBuilder.java` | `view/MenuBuilder.java` | `MenuBuilder` | made preset-aware in T10 |
+| `builder/MenuBuilder.java` | `view/MenuBuilder.java` | `MenuBuilder` | preset-aware: tone, footer |
 | `component/ActionButton.java` | `view/ActionButton.java` | `ActionButton` | broken cast, fixed in T10 |
 | `component/ActionRow.java` | `view/Row.java` | `Row` | renamed to avoid the JDA clash |
 | `component/Field.java` | `view/Field.java` | `Field` | emoji from preset in T10 |

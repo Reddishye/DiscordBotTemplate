@@ -889,6 +889,57 @@ mean a bot operator reading a stack trace in a language they did not choose. The
 scoped to the menu package and to user-facing call sites so this distinction is enforced
 rather than assumed.
 
+### `Icons` was widened to `Emoji`, which made it unusable
+
+T7 stored what `Emoji.fromFormatted` returns as `Emoji`. That return type is actually
+**`EmojiUnion`**, and `Button.of(style, id, label, emoji)` requires an `EmojiUnion`, so
+every component that renders a preset icon would have needed a cast. Widening a factory's
+return type on the way in pushes the cost onto every caller.
+
+`Icons` now stores and returns `EmojiUnion`. This is a T7 public-API change, made in T10a
+because T10a is the first thing that actually had to call `Button.of` and so the first
+time the cost became real.
+
+Note the related JDA asymmetry, confirmed against the 6.4.2 jar: the *interfaces*
+`UnicodeEmoji` and `RichCustomEmoji` do not extend `EmojiUnion`, while their
+implementations `UnicodeEmojiImpl` and `RichCustomEmojiImpl` implement it directly. So
+`EmojiUnion` is what `Emoji.fromFormatted` hands back, and it is what `Button.of` takes,
+regardless of which interface the static type suggests.
+
+### Removing `Field`'s hardcoded emoji exposed a JDA constraint
+
+Discord rejects an action button with **neither a label nor an emoji**, which the previous
+hardcoded `lucide_check` glyph had been silently satisfying. With the glyph removed, a
+read-only `Field` rendered a button with no label and no emoji, and any preset with no
+icons (`minimal`) crashed.
+
+`Field` now draws a line of text when it has no action, because a field with nothing to
+press should not have a button at all. An editable field keeps its button, and when the
+preset defines no icon for it the button falls back to the field's own label, which is
+caller-supplied and therefore already localized. Inventing a glyph there would have
+reintroduced exactly what T10a removed.
+
+### `Divider` follows density, not just the preset's gap
+
+`Separator` has only two spacings, `SMALL` and `LARGE`, while a preset expresses three
+densities and two gap values. The effective rule is: `COMPACT` is always `SMALL`,
+`COMFORTABLE` is always `LARGE`, and only `NORMAL` defers to `divider().gap()`. Density
+is mostly about how much room a menu needs rather than how a rule is drawn, so a compact
+menu is compact throughout.
+
+`Divider.line()` and `Divider.space()` differ only in whether they draw a rule; both
+reserve the same space, which is why `minimal`, whose palette hides rules, still separates
+its sections.
+
+### `MenuRouter.Builder` records ownership instead of guessing it
+
+The builder knows whether it created each component, so `close()` closes only what it
+made. The rule is that whoever creates a component closes it. A router given a shared
+executor must not close it, because a shared executor outlives one router and closing it
+would silently break the next one. Guessing from the type or from a flag the caller sets
+would put the responsibility on the caller to remember; making the builder remember is
+the only option that cannot be forgotten.
+
 ### `PresetLoader` uses the tree model, not data binding, for three reasons
 
 Data binding was rejected on purpose. Each of the three behaviours the format needs is

@@ -13,6 +13,8 @@ package es.redactado.menu.preset;
  * @param info the colour for neutral information
  * @param neutral the colour for chrome such as dividers and muted text
  */
+import java.util.Objects;
+
 public record Palette(int accent, int success, int warning, int danger, int info, int neutral) {
 
     /** Largest value a packed RGB colour can hold. */
@@ -33,5 +35,23 @@ public record Palette(int accent, int success, int warning, int danger, int info
                     "palette colour %s must be between 0 and 0xFFFFFF, got 0x%X"
                             .formatted(name, value));
         }
+    }
+
+    /**
+     * The colour a tone means.
+     *
+     * @param tone what the colour is for
+     * @return the packed RGB value
+     * @throws NullPointerException if {@code tone} is null
+     */
+    public int color(Tone tone) {
+        return switch (Objects.requireNonNull(tone, "tone")) {
+            case ACCENT -> accent;
+            case SUCCESS -> success;
+            case WARNING -> warning;
+            case DANGER -> danger;
+            case INFO -> info;
+            case NEUTRAL -> neutral;
+        };
     }
 }

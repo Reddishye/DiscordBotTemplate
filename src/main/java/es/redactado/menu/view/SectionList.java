@@ -3,6 +3,7 @@ package es.redactado.menu.view;
 import es.redactado.menu.api.MenuComponent;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.core.ComponentId;
+import es.redactado.menu.preset.IconKey;
 import java.util.ArrayList;
 import java.util.List;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -10,7 +11,6 @@ import net.dv8tion.jda.api.components.buttons.ButtonStyle;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
 import net.dv8tion.jda.api.components.section.Section;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
-import net.dv8tion.jda.api.entities.emoji.Emoji;
 
 /**
  * Paginated list of items with page navigation.
@@ -71,19 +71,19 @@ public class SectionList<T> implements MenuComponent {
         String pageText = "%d/%d".formatted(page + 1, totalPages);
         List<RowItem> nav = new ArrayList<>();
         if (page > 0) {
-            nav.add(c -> pageButton(c, page - 1, Character.toString(0x25C0)));
+            nav.add(c -> pageButton(c, page - 1, IconKey.PREVIOUS));
         }
         nav.add(c -> Button.of(ButtonStyle.SECONDARY, NO_ACTION, pageText));
         if (page < totalPages - 1) {
-            nav.add(c -> pageButton(c, page + 1, Character.toString(0x25B6)));
+            nav.add(c -> pageButton(c, page + 1, IconKey.NEXT));
         }
         return nav.toArray(new RowItem[0]);
     }
 
-    private Button pageButton(MenuContext ctx, int targetPage, String arrow) {
+    private Button pageButton(MenuContext ctx, int targetPage, IconKey direction) {
         return Button.of(
                 ButtonStyle.SECONDARY,
                 ComponentId.encode(ctx.menuId(), PAGE_ACTION, stateKey, String.valueOf(targetPage)),
-                Emoji.fromUnicode(arrow));
+                Looks.icon(ctx.preset(), direction).orElse(null));
     }
 }

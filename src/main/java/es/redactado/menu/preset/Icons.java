@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.entities.emoji.EmojiUnion;
 
 /**
  * The icon set of a preset, keyed by meaning rather than by symbol.
@@ -26,12 +27,12 @@ public final class Icons {
 
     private static final Icons NONE = new Icons(Map.of());
 
-    private final Map<IconKey, Emoji> resolved;
+    private final Map<IconKey, EmojiUnion> resolved;
     private final Map<IconKey, String> formatted;
 
     private Icons(Map<IconKey, String> formatted) {
         Map<IconKey, String> copy = new LinkedHashMap<>();
-        Map<IconKey, Emoji> emojis = new EnumMap<>(IconKey.class);
+        Map<IconKey, EmojiUnion> emojis = new EnumMap<>(IconKey.class);
         formatted.forEach(
                 (key, value) -> {
                     if (value == null || value.isBlank()) {
@@ -74,10 +75,14 @@ public final class Icons {
     /**
      * The resolved emoji for a key.
      *
+     * <p>Typed as {@link EmojiUnion} because that is what JDA's own
+     * {@code Emoji.fromFormatted} returns and what {@code Button.of} requires. Widening
+     * it to {@link Emoji} here would force every caller that renders a button to cast.
+     *
      * @param key the meaning
      * @return the emoji, or empty when this set has none for that key
      */
-    public Optional<Emoji> get(IconKey key) {
+    public Optional<EmojiUnion> get(IconKey key) {
         return Optional.ofNullable(resolved.get(key));
     }
 
