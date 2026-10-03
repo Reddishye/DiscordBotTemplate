@@ -525,6 +525,92 @@ No string switch and no `.equals("` call remains anywhere in `core` or `view`;
 the intended form rather than a leftover. The compiler enforces exhaustiveness,
 which is why adding an `Ack` constant cannot silently skip an acknowledgement.
 
+### The preferred owner check worked; no fallback was needed
+
+Verified in `JDA-6.4.2-sources.jar` before writing any code, and implemented as
+specified.
+
+| Need | Verified API |
+| --- | --- |
+| Message owner | `Message#getInteractionMetadata()` returning `Message.InteractionMetadata` or `null` |
+| Owner user | `Message.InteractionMetadata#getUser()` returning `User` |
+| Compare | `User#getIdLong()` |
+| Modal origin | `ModalInteraction#getMessage()`, declared `@Nullable` |
+
+Two details worth recording:
+
+- `InteractionMetadata` is a **nested class inside `Message`**, not a top-level
+  type, so the type name is `Message.InteractionMetadata`.
+- `ModalInteraction` does **not** extend `IModalCallback`, so a modal submission
+  cannot open a modal. `AbstractMenu#showModal` keeps the `instanceof` check.
+
+The fallback, where the owner is the first id parameter compared with
+`Long.parseUnsignedLong`, was **not** implemented. The metadata check needs no
+cooperation from menu authors, which is strictly better.
+
+`owns` is allocation-free on the allowed path: it takes the message and compares
+two longs, and returns before creating anything. The three early returns are, in
+order, a shared menu, no message, and no interaction metadata.
+
+### No global concurrency cap exists yet
+
+`MenuExecutor.virtual()` uses `Executors.newThreadPerTaskExecutor`, which is
+**unbounded**. Virtual threads are cheap because they park rather than block a
+platform thread, but nothing stops 50,000 simultaneous clicks from creating 50,000
+virtual threads.
+
+This is a deliberate deferral, not an oversight. The real ceiling on a menu
+handler is whatever it waits on, and that is almost always a bounded downstream
+resource rather than CPU:
+
+- the HikariCP pool, which queues when exhausted,
+- a database's own connection limit,
+- Discord's per-channel rate limit,
+- HTTP client connection pools.
+
+Adding a semaphore now would measure nothing real and would reject clicks that
+would otherwise queue harmlessly. Revisit alongside the async data layer in T6,
+once there is a concrete pool to size against.
+
+**Measured, for reference:** 1,000 clicks on 1,000 distinct messages, each
+handler completing after 50 ms, finish in **423 ms** against a 10 s budget. The
+serial equivalent would be about 50 s. Full assertions, including "every handler
+ran exactly once" and "no message left claimed", are in `MenuRouterThroughputTest`.
+
+### `close` does not wait for a handler's future, only for its task
+
+A test initially assumed `close()` would block until a handler's returned future
+completed. It does not, and should not.
+
+The executor task is "build the context, invoke the handler, attach a completion".
+That finishes as soon as the future is attached. A handler that returns an
+incomplete future therefore holds nothing open, so `close()` returns immediately
+and correctly.
+
+To actually exercise the bounded wait, the handler body itself has to be stuck.
+`closeIsBounded` blocks the virtual thread on a latch nobody releases, and asserts
+`close` returns between 3 and 9 seconds, which brackets the 5-second
+`awaitTermination` plus interrupt.
+
+### One `catch (Exception)` remains, in `MenuRouter#submit`
+
+It covers a handler that throws *before* returning its future. `whenComplete` only
+observes failures that arrive through the future, so the synchronous case needs
+its own guard. Section 2.2 permits a broad catch solely in the single top-level
+dispatcher, and this is it. `NoBlockingCallsTest` enforces the separate rule that
+no blocking call exists under `menu`.
+
+The scanner is not vacuous: injecting `.join()` into any main source under
+`es/redactado/menu` fails the build and names both the file and the call.
+
+### `UserFacingException` messages are English literals until T9
+
+As specified for this task. The message is written by the throwing code, so it
+cannot currently be localized. T9 replaces the string with a key resolved through
+`Messages`. The same applies to the router's own literals: "This menu is not
+yours.", "The bot is busy. Try again.", "Unknown action.", and "Something went
+wrong (ref: ...)."
+
 ### Hardcoded emoji that must move into presets
 
 Left in place by T1 because removing them changes rendered output:

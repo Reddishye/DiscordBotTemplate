@@ -53,9 +53,29 @@ public interface MenuContext {
      *
      * @param index zero-based position
      * @return the parameter
-     * @throws StateNotFoundException when the index is out of range
+     * @throws UserFacingException when the index is out of range
      */
-    String require(int index);
+    String requireString(int index);
+
+    /**
+     * Parameter at the given index, parsed as a 32-bit integer.
+     *
+     * @param index zero-based position
+     * @return the parsed value
+     * @throws UserFacingException when the index is out of range or the value is
+     *     not an integer
+     */
+    int requireInt(int index);
+
+    /**
+     * Parameter at the given index, parsed as a 64-bit integer.
+     *
+     * @param index zero-based position
+     * @return the parsed value
+     * @throws UserFacingException when the index is out of range or the value is
+     *     not a long
+     */
+    long requireLong(int index);
 
     /**
      * Id of the user who triggered the interaction.

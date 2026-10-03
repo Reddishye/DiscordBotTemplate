@@ -128,6 +128,10 @@ core  ->  api
 view  ->  api, core
 ```
 
+`core` also holds `MenuExecutor`, which wraps an `ExecutorService`, and
+`InteractionGuard`, a `ConcurrentHashMap.newKeySet()` of message ids currently
+being handled. Both were added in T4.
+
 Two cycles had to be broken. `Limits` moved from `view` to `api`, because
 `core.ComponentId` needs `MAX_CUSTOM_ID_LENGTH` and `view` already needs
 `core.ComponentId`. `api.MenuComponent` stopped importing `view.Row` for a
@@ -157,8 +161,9 @@ src/main/java/es/redactado/menu/
   api/                            Menu, MenuContext, MenuComponent, Ack,
                                    ActionTable, ButtonAction, ModalAction,
                                    ButtonHandler, ModalHandler, Done, Limits,
-                                   exceptions
-  core/                           MenuRouter, ComponentId, Replies, navigation,
+                                   UserFacingException, exceptions
+  core/                           MenuRouter, MenuExecutor, InteractionGuard,
+                                   ComponentId, Replies, ErrorReply, navigation,
                                    AbstractMenu, BaseContext
   view/                           MenuBuilder, components, Limits, Validator
   RowItem.java                   Action-row children: buttons and selects
@@ -313,7 +318,7 @@ is the final path; the "Name" column is the final type name where it differs.
 | `component/Text.java` | `view/Text.java` | `Text` | as-is |
 | `component/ThumbnailComponent.java` | `view/ThumbnailComponent.java` | `ThumbnailComponent` | broken cast, folded into `Section` in T10 |
 | `dispatch/ComponentId.java` | `core/ComponentId.java` | `ComponentId` | **rewritten in T2**: `indexOf`/`substring` only, `decode` returns `Optional` |
-| `dispatch/MenuRouter.java` | `core/MenuRouter.java` | `MenuRouter` | **T3** dispatches through immutable action tables and performs the ack; executor in T4 |
+| `dispatch/MenuRouter.java` | `core/MenuRouter.java` | `MenuRouter` | **T3** action tables and ack; **T4** owner check, re-entrancy guard, and virtual-thread executor |
 | `exception/ComponentLimitException.java` | `api/ComponentLimitException.java` | `ComponentLimitException` | kept |
 | `exception/MenuException.java` | `api/MenuException.java` | `MenuException` | kept as the base type |
 | `exception/MenuNotFoundException.java` | `api/MenuNotFoundException.java` | `MenuNotFoundException` | kept |

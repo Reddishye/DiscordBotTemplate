@@ -7,7 +7,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.Collection;
 import net.dv8tion.jda.api.components.MessageTopLevelComponent;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.InteractionHook;
@@ -17,24 +19,46 @@ import net.dv8tion.jda.api.requests.restaction.interactions.MessageEditCallbackA
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 
 /**
- * Builds stubbed JDA interactions and hooks for the router tests.
+ * Builds stubbed JDA interactions, messages, and hooks for the router tests.
  *
- * <p>Nothing here touches a gateway. Every interaction is a Mockito mock, and only
- * the handful of methods the router actually calls are stubbed.
+ * <p>Nothing here touches a gateway. Every object is a Mockito mock, and only the
+ * handful of methods the router actually calls are stubbed.
+ *
+ * <p>Stubs are always created before the {@code when(...)} that returns them.
+ * Mockito cannot record a stub while another stubbing is in progress, so calling a
+ * factory from inside a {@code when} argument fails.
  */
 final class JdaMocks {
 
     private JdaMocks() {}
 
     static ButtonInteractionEvent button(String componentId, boolean acknowledged) {
+        return button(componentId, acknowledged, NO_MESSAGE, Long.MAX_VALUE);
+    }
+
+    /**
+     * Builds a button event on a message owned by {@code ownerId}.
+     *
+     * @param ownerId the interacting user, or {@link Long#MAX_VALUE} for a message
+     *     with no interaction metadata, meaning it was sent directly to a channel
+     */
+    static ButtonInteractionEvent button(
+            String componentId, boolean acknowledged, long messageId, long ownerId) {
         InteractionHook hook = hook();
         MessageEditCallbackAction deferEdit = mock(MessageEditCallbackAction.class);
         ReplyCallbackAction reply = replyAction();
+        Message message = message(messageId, ownerId);
+        User clicker = clicker();
+        Guild guild = guild();
 
         ButtonInteractionEvent event = mock(ButtonInteractionEvent.class);
         when(event.getComponentId()).thenReturn(componentId);
         when(event.isAcknowledged()).thenReturn(acknowledged);
         when(event.getHook()).thenReturn(hook);
+        when(event.getMessage()).thenReturn(message);
+        when(event.getMessageIdLong()).thenReturn(message == null ? 0 : messageId);
+        when(event.getUser()).thenReturn(clicker);
+        when(event.getGuild()).thenReturn(guild);
         when(event.deferEdit()).thenReturn(deferEdit);
         when(event.deferReply(true)).thenReturn(reply);
         when(event.reply(anyString())).thenReturn(reply);
@@ -42,18 +66,66 @@ final class JdaMocks {
     }
 
     static ModalInteractionEvent modal(String modalId, boolean acknowledged) {
+        return modal(modalId, acknowledged, NO_MESSAGE, Long.MAX_VALUE);
+    }
+
+    static ModalInteractionEvent modal(
+            String modalId, boolean acknowledged, long messageId, long ownerId) {
         InteractionHook hook = hook();
         MessageEditCallbackAction deferEdit = mock(MessageEditCallbackAction.class);
         ReplyCallbackAction reply = replyAction();
+        Message message = message(messageId, ownerId);
+        User clicker = clicker();
+        Guild guild = guild();
 
         ModalInteractionEvent event = mock(ModalInteractionEvent.class);
         when(event.getModalId()).thenReturn(modalId);
         when(event.isAcknowledged()).thenReturn(acknowledged);
         when(event.getHook()).thenReturn(hook);
+        when(event.getMessage()).thenReturn(message);
+        when(event.getUser()).thenReturn(clicker);
+        when(event.getGuild()).thenReturn(guild);
         when(event.deferEdit()).thenReturn(deferEdit);
         when(event.deferReply(true)).thenReturn(reply);
         when(event.reply(anyString())).thenReturn(reply);
         return event;
+    }
+
+    /** Message id meaning "this interaction has no menu message". */
+    static final long NO_MESSAGE = -1L;
+
+    /** User id meaning "the message carries no interaction metadata". */
+    static final long NO_OWNER = Long.MAX_VALUE;
+
+    static Message message(long messageId, long ownerId) {
+        if (messageId == NO_MESSAGE) {
+            return null;
+        }
+        Message.InteractionMetadata metadata = null;
+        if (ownerId != NO_OWNER) {
+            User ownerUser = user(ownerId);
+            metadata = mock(Message.InteractionMetadata.class);
+            when(metadata.getUser()).thenReturn(ownerUser);
+        }
+        Message message = mock(Message.class);
+        when(message.getIdLong()).thenReturn(messageId);
+        when(message.getInteractionMetadata()).thenReturn(metadata);
+        return message;
+    }
+
+    private static User clicker() {
+        return user(42L);
+    }
+
+    private static Guild guild() {
+        return mock(Guild.class);
+    }
+
+    static User user(long id) {
+        User user = mock(User.class);
+        when(user.getIdLong()).thenReturn(id);
+        when(user.getId()).thenReturn(Long.toString(id));
+        return user;
     }
 
     static InteractionHook hook() {

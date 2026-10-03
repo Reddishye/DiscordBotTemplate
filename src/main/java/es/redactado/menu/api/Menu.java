@@ -24,6 +24,19 @@ public interface Menu {
     Container render(MenuContext ctx);
 
     /**
+     * Whether this menu is visible to and usable by everyone.
+     *
+     * <p>A personal menu is bound to the user whose interaction produced its
+     * message, and only that user may press its buttons. A shared menu skips that
+     * check.
+     *
+     * @return {@code true} when the menu is not personal
+     */
+    default boolean shared() {
+        return false;
+    }
+
+    /**
      * Declares every action this menu handles, together with how each one is
      * acknowledged.
      *

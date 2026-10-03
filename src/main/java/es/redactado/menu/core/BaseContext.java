@@ -1,9 +1,14 @@
 package es.redactado.menu.core;
 
 import es.redactado.menu.api.MenuContext;
-import es.redactado.menu.api.StateNotFoundException;
-import java.util.*;
+import es.redactado.menu.api.UserFacingException;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
@@ -14,6 +19,9 @@ import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 
 public class BaseContext implements MenuContext {
+
+    private static final String INVALID_PARAM_TEXT = "Invalid or missing parameter.";
+    private static final Supplier<UserFacingException> INVALID_PARAM = BaseContext::invalidParam;
 
     private final String menuId;
     private final String action;
@@ -95,8 +103,30 @@ public class BaseContext implements MenuContext {
     }
 
     @Override
-    public String require(int index) {
-        return param(index).orElseThrow(() -> new StateNotFoundException("param[" + index + "]"));
+    public String requireString(int index) {
+        return param(index).filter(value -> !value.isBlank()).orElseThrow(INVALID_PARAM);
+    }
+
+    @Override
+    public int requireInt(int index) {
+        try {
+            return Integer.parseInt(requireString(index));
+        } catch (NumberFormatException e) {
+            throw invalidParam();
+        }
+    }
+
+    @Override
+    public long requireLong(int index) {
+        try {
+            return Long.parseLong(requireString(index));
+        } catch (NumberFormatException e) {
+            throw invalidParam();
+        }
+    }
+
+    private static UserFacingException invalidParam() {
+        return new UserFacingException(INVALID_PARAM_TEXT);
     }
 
     @Override

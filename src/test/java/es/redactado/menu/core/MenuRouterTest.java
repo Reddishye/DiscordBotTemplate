@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -25,6 +26,7 @@ import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,6 +35,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
 class MenuRouterTest {
+
+    /** Generous upper bound for the executor to pick a task up. */
+    private static final int AWAIT_MS = 5_000;
 
     private MenuRouter router;
     private ButtonHandler editHandler;
@@ -67,7 +72,7 @@ class MenuRouterTest {
 
     @BeforeEach
     void setUp() {
-        router = new MenuRouter();
+        router = new MenuRouter(MenuExecutor.virtual());
         editHandler = mock(ButtonHandler.class);
         replyHandler = mock(ButtonHandler.class);
         modalHandler = mock(ButtonHandler.class);
@@ -104,7 +109,7 @@ class MenuRouterTest {
 
             InOrder order = inOrder(event, editHandler);
             order.verify(event).deferEdit();
-            order.verify(editHandler).handle(any(), any());
+            order.verify(editHandler, timeout(AWAIT_MS)).handle(any(), any());
             verify(event, never()).deferReply(true);
         }
 
@@ -117,7 +122,7 @@ class MenuRouterTest {
 
             InOrder order = inOrder(event, replyHandler);
             order.verify(event).deferReply(true);
-            order.verify(replyHandler).handle(any(), any());
+            order.verify(replyHandler, timeout(AWAIT_MS)).handle(any(), any());
             verify(event, never()).deferEdit();
         }
 
@@ -128,7 +133,7 @@ class MenuRouterTest {
 
             assertThat(router.dispatchButton(event)).isTrue();
 
-            verify(modalHandler).handle(any(), any());
+            verify(modalHandler, timeout(AWAIT_MS)).handle(any(), any());
             verify(event, never()).deferEdit();
             verify(event, never()).deferReply(true);
         }
@@ -140,7 +145,7 @@ class MenuRouterTest {
 
             assertThat(router.dispatchButton(event)).isTrue();
 
-            verify(noneHandler).handle(any(), any());
+            verify(noneHandler, timeout(AWAIT_MS)).handle(any(), any());
             verify(event, never()).deferEdit();
             verify(event, never()).deferReply(true);
         }
@@ -154,7 +159,7 @@ class MenuRouterTest {
 
             InOrder order = inOrder(event, submitHandler);
             order.verify(event).deferEdit();
-            order.verify(submitHandler).handle(any(), any());
+            order.verify(submitHandler, timeout(AWAIT_MS)).handle(any(), any());
         }
     }
 
@@ -175,7 +180,7 @@ class MenuRouterTest {
 
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
             verify(event, never()).getHook();
-            verify(event).reply(captor.capture());
+            verify(event, timeout(AWAIT_MS)).reply(captor.capture());
             assertThat(captor.getValue()).isEqualTo(Replies.UNKNOWN_ACTION);
         }
 
@@ -190,7 +195,7 @@ class MenuRouterTest {
             verify(event, never()).deferEdit();
 
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-            verify(event).reply(captor.capture());
+            verify(event, timeout(AWAIT_MS)).reply(captor.capture());
             assertThat(captor.getValue()).isEqualTo(Replies.UNKNOWN_ACTION);
         }
 
@@ -231,7 +236,7 @@ class MenuRouterTest {
             assertThat(router.dispatchButton(event)).isTrue();
 
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-            verify(event.getHook()).sendMessage(captor.capture());
+            verify(event.getHook(), timeout(AWAIT_MS)).sendMessage(captor.capture());
             verify(event, never()).reply(anyString());
             assertThat(captor.getValue()).doesNotContain("secret internal detail");
         }
@@ -246,8 +251,8 @@ class MenuRouterTest {
             assertThat(router.dispatchButton(event)).isTrue();
 
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-            verify(event).reply(captor.capture());
-            assertThat(captor.getValue()).isEqualTo(Replies.ERROR);
+            verify(event, timeout(AWAIT_MS)).reply(captor.capture());
+            assertThat(captor.getValue()).contains("ref:");
         }
 
         @Test
@@ -260,7 +265,9 @@ class MenuRouterTest {
 
             assertThat(router.dispatchButton(event)).isTrue();
 
-            verify(event.getHook()).sendMessage(Replies.ERROR);
+            ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+            verify(event.getHook(), timeout(AWAIT_MS)).sendMessage(captor.capture());
+            assertThat(captor.getValue()).contains("ref:");
         }
 
         @Test
@@ -273,11 +280,17 @@ class MenuRouterTest {
             router.dispatchButton(event);
 
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-            verify(event).reply(captor.capture());
+            verify(event, timeout(AWAIT_MS)).reply(captor.capture());
             assertThat(captor.getValue())
-                    .isEqualTo(Replies.ERROR)
+                    .startsWith("Something went wrong (ref:")
+                    .endsWith(").")
                     .doesNotContain("secret internal detail");
         }
+    }
+
+    @AfterEach
+    void tearDown() {
+        router.close();
     }
 
     @Nested

@@ -14,7 +14,6 @@ import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 final class Replies {
 
     static final String UNKNOWN_ACTION = "Unknown action.";
-    static final String ERROR = "Error.";
 
     private Replies() {}
 
