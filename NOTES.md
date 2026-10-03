@@ -1298,3 +1298,85 @@ Why the commit 1 tests missed it: `MenuRouterSelectTest` asserted
 acknowledgement, ownership, the guard and the error path, none of which touch the
 session. `MenuRouterSelectTest.handlerGetsItsSession` now covers it and fails
 without the fix, verified by stashing `BaseContext.java` and re-running.
+
+## T10b commit 6: modal forms
+
+### `ModalForm` is the one mutable type in the framework
+
+Every other component is immutable and copy-on-write. A form is not, and cannot be:
+its fields are configured by calls that follow the call that created them
+(`shortField("why", "Why").required(false)`), and there is no ordering in which a
+field could be configured before it existed, so there is nothing to copy yet.
+
+**Decision.** Mutable, built inside the handler that opens it, and discarded. The
+Javadoc says so in the class comment, and the danger is stated rather than left to
+be inferred: it is not thread-safe, must not be held in a field, reused across
+clicks, or put in a session. Reusing one would leak one click's answers into the
+next, which is the bug this shape exists to make hard to write by accident.
+
+### The per-field terminal call is `component()`, not `build()`
+
+`shortField` returns an `Input`, and `Input` also needs a way to become JDA. Naming
+both `build` meant this chain compiled and quietly produced a `Label`:
+
+```java
+ModalForm.create(ctx, "apply", "Apply").shortField("a", "A").build();
+// returns a Label, not a Modal
+```
+
+That is the worst shape of bug this package can have: it compiles, it type-checks,
+and it hands `showModal` something that is not a modal. `Input#component()` is
+now package-private and distinctly named, so the same chain fails to compile and
+the example keeps the form in a local:
+
+```java
+ModalForm form = ModalForm.create(ctx, "apply", "Apply");
+form.shortField("a", "A").required(true);
+showModal(ctx, form.build());
+```
+
+Found while writing the tests, not by them.
+
+### The nested class is `Input`, not `Field`
+
+`view.Field` already exists and means something else: one labelled value in a
+message. A second `Field` in the same package would have been resolved by whichever
+import won, in a file that used both. `ModalForm.Input` names the JDA thing it
+wraps, `TextInput`, and cannot be confused with either.
+
+**Related test trap.** A `@Nested` class named `Limits` in `ModalFormTest` shadowed
+the imported `api.Limits`, so every `Limits.MAX_MODAL_FIELDS` failed to compile
+with "cannot find symbol: variable MAX_MODAL_FIELDS" and no hint about the shadowing.
+The nested class is now `Boundaries`.
+
+### JDA 6.4.2 modal facts worth recording
+
+Checked in `JDA-6.4.2-sources.jar`:
+
+- The only entry point is `Modal.create(id, title)`; the constructor of `Modal.Builder`
+  is `protected`.
+- `Modal.Builder` has **no** `addActionRow`. Every input must be wrapped in a
+  `Label`, which is what `ModalForm.Input#component` does.
+- `TextInput.create(id, style)` takes no label. The label lives on `Label.of(label, input)`
+  and is limited to 45 characters by `Label.LABEL_MAX_LENGTH`.
+- **The placeholder getter is `getPlaceHolder()`, with a capital H.** `getPlaceholder()`
+  exists only on the builder. Reading the input back needs the odd spelling.
+- An unset length is `-1`, not `0`. `Input` leaves both at `-1` unless `length` was
+  called, so a pre-filled input is not silently capped at zero characters.
+- `Modal.MAX_COMPONENTS` is 5, `Modal.MAX_TITLE_LENGTH` 45, `TextInput.MAX_ID_LENGTH`
+  100, `TextInput.MAX_PLACEHOLDER_LENGTH` 100, `TextInput.MAX_VALUE_LENGTH` 4000.
+
+`Modal.MAX_ID_LENGTH` was deliberately **not** added to `Limits`: it is 100, the
+same value `MAX_CUSTOM_ID_LENGTH` already holds, and the modal id is produced by
+`ComponentId.encode`, which enforces that limit. A second constant with the same
+value and a different name would be one more thing to keep in step for nothing.
+
+### A modal must be the first and only response, and that is now tested
+
+`ModalEndToEndTest.deferredEditLeavesNoRoomForAModal` opens the same form behind
+`Ack.DEFER_EDIT` and asserts `showModal` refuses.
+
+One wrinkle worth recording: a mocked interaction cannot flip its own
+`isAcknowledged()` when the router defers it, so the test builds the event as
+already acknowledged. That is the honest model of what a handler receives, and it
+is the same stubbing the select and pager end-to-end tests use.

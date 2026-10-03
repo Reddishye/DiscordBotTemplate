@@ -16,9 +16,11 @@ import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.interactions.InteractionHook;
+import net.dv8tion.jda.api.modals.Modal;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageEditAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.MessageEditCallbackAction;
+import net.dv8tion.jda.api.requests.restaction.interactions.ModalCallbackAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 
 /**
@@ -65,6 +67,7 @@ final class JdaMocks {
         when(event.deferEdit()).thenReturn(deferEdit);
         when(event.deferReply(true)).thenReturn(reply);
         when(event.reply(anyString())).thenReturn(reply);
+        when(event.replyModal(any(Modal.class))).thenReturn(modalAction());
         return event;
     }
 
@@ -205,5 +208,11 @@ final class JdaMocks {
         ReplyCallbackAction action = mock(ReplyCallbackAction.class);
         when(action.setEphemeral(true)).thenReturn(action);
         return action;
+    }
+
+    /** Raw because JDA declares {@code replyModal} as returning the raw type. */
+    @SuppressWarnings("rawtypes")
+    private static ModalCallbackAction modalAction() {
+        return mock(ModalCallbackAction.class);
     }
 }
