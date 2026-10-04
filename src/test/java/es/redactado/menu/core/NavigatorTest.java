@@ -76,6 +76,14 @@ class NavigatorTest {
         Menu menu = mock(Menu.class);
         when(menu.id()).thenReturn(id);
         when(menu.home(any())).thenReturn(new NavEntry(id, "home", List.of()));
+        // A mocked menu answers null for a record, and a navigation that pushes asks the
+        // menu it is leaving which view is on screen. Stated rather than left implicit.
+        when(menu.currentView(any()))
+                .thenAnswer(
+                        invocation -> {
+                            MenuContext ctx = invocation.getArgument(0);
+                            return new NavEntry(id, ctx.action(), ctx.params());
+                        });
         when(menu.render(any()))
                 .thenAnswer(
                         invocation -> {

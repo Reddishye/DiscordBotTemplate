@@ -6,6 +6,7 @@ import es.redactado.menu.api.Loader;
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.NavEntry;
+import es.redactado.menu.api.NavigationMode;
 import es.redactado.menu.api.Renderer;
 import es.redactado.menu.api.UserFacingException;
 import java.time.Duration;
@@ -70,7 +71,10 @@ public abstract class AbstractMenu implements Menu {
      */
     private static CompletableFuture<Void> navigate(MenuContext ctx, ButtonInteractionEvent event) {
         NavigationAction navigation = NavigationAction.fromContext(ctx);
-        return ctx.navigate(navigation.mode(), navigation.targetMenuId());
+        if (navigation.mode() == NavigationMode.BACK) {
+            return ctx.navigate(NavigationMode.BACK, "");
+        }
+        return ctx.navigate(navigation.mode(), navigation.target());
     }
 
     /**
@@ -172,6 +176,33 @@ public abstract class AbstractMenu implements Menu {
             throw new IllegalStateException(UNACKNOWLEDGED);
         }
         return render(ctx).thenCompose(container -> ViewEditor.edit(event.getHook(), container));
+    }
+
+    /**
+     * The failure a menu returns for an action it does not know.
+     *
+     * <p>For a menu whose {@link #render(MenuContext)} switches on the action: the default
+     * branch returns this, so an action from an old message, a hand-edited component id or
+     * a renamed view produces one localized sentence instead of a generic error or a
+     * container that is merely blank.
+     *
+     * <p>Generic so it serves a render as well as a handler:
+     *
+     * <pre>{@code
+     * return switch (ctx.action()) {
+     *     case "home" -> CompletableFuture.completedFuture(home(ctx));
+     *     case "detail" -> CompletableFuture.completedFuture(detail(ctx));
+     *     default -> unknownView(ctx);
+     * };
+     * }</pre>
+     *
+     * @param ctx the context of the current interaction
+     * @param <T> what the caller was going to produce, usually a container
+     * @return a future that has already failed
+     */
+    protected <T> CompletableFuture<T> unknownView(MenuContext ctx) {
+        return CompletableFuture.failedFuture(
+                new UserFacingException(MessageKeys.ERROR_UNKNOWN_VIEW));
     }
 
     /**

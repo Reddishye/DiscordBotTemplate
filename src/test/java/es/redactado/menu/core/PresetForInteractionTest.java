@@ -19,6 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import net.dv8tion.jda.api.components.container.Container;
+import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.DiscordLocale;
 import org.junit.jupiter.api.DisplayName;
@@ -276,7 +277,10 @@ class PresetForInteractionTest {
             public CompletableFuture<Container> render(MenuContext ctx) {
                 render.record(ctx.preset());
                 done.countDown();
-                return CompletableFuture.completedFuture(null);
+                // A real container, not null: a navigation records the history only after
+                // the edit succeeds, and an edit of nothing fails.
+                return CompletableFuture.completedFuture(
+                        Container.of(TextDisplay.of(ctx.preset().name())));
             }
 
             @Override

@@ -224,12 +224,30 @@ public interface MenuContext {
     /**
      * Moves to another view, using the session for history.
      *
+     * <p>Targets the named menu's home view, which is all a menu with one screen needs.
+     *
      * @param mode how to move
      * @param targetMenuId the menu to show, ignored by {@link NavigationMode#BACK}
      * @return a completed future
      * @throws UserFacingException if the target menu is not registered
      */
     CompletableFuture<Void> navigate(NavigationMode mode, String targetMenuId);
+
+    /**
+     * Moves to a named view, using the session for history.
+     *
+     * <p>For a menu with several views, where the menu id alone does not say what to show.
+     * The entry carries the view's action and any params it was invoked with, so going back
+     * can rebuild exactly what was on screen rather than approximating it from the menu's
+     * home view.
+     *
+     * @param mode how to move
+     * @param target the menu, view and params to show; ignored by {@link NavigationMode#BACK}
+     * @return a completed future
+     * @throws UserFacingException if the target menu is not registered, or the view is not
+     *     one the menu knows
+     */
+    CompletableFuture<Void> navigate(NavigationMode mode, NavEntry target);
 
     /**
      * A context addressing a different view of the same message.

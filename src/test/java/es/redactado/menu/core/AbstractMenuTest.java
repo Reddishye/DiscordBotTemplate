@@ -2,6 +2,8 @@ package es.redactado.menu.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,8 +12,10 @@ import es.redactado.menu.api.Ack;
 import es.redactado.menu.api.ActionTable;
 import es.redactado.menu.api.Done;
 import es.redactado.menu.api.MenuContext;
+import es.redactado.menu.api.NavEntry;
 import es.redactado.menu.api.NavigationMode;
 import es.redactado.menu.api.Render;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.components.container.Container;
@@ -23,6 +27,7 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.modals.Modal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class AbstractMenuTest {
 
@@ -134,18 +139,55 @@ class AbstractMenuTest {
     }
 
     @Test
-    @DisplayName("the nav handler delegates the parsed mode and target to the context")
+    @DisplayName("the nav handler delegates a menu target as the target menu's home view")
     void navHandlerDelegates() {
         MenuContext ctx = mock(MenuContext.class);
         when(ctx.requireString(0)).thenReturn("push");
         when(ctx.param(1)).thenReturn(Optional.of("other"));
-        when(ctx.navigate(NavigationMode.PUSH, "other")).thenReturn(Done.NOW);
+        when(ctx.navigate(eq(NavigationMode.PUSH), any(NavEntry.class))).thenReturn(Done.NOW);
 
         ActionTable table = tableOf(new BareMenu());
         var handler = table.button("nav").orElseThrow().handler();
 
         assertThat(handler.handle(ctx, JdaMocks.button("menu:bare:nav", true))).isEqualTo(Done.NOW);
-        verify(ctx).navigate(NavigationMode.PUSH, "other");
+        ArgumentCaptor<NavEntry> target = ArgumentCaptor.forClass(NavEntry.class);
+        verify(ctx).navigate(eq(NavigationMode.PUSH), target.capture());
+        assertThat(target.getValue())
+                .as("an id naming only a menu means that menu's home view")
+                .isEqualTo(new NavEntry("other", "home", List.of()));
+    }
+
+    @Test
+    @DisplayName("the nav handler hands a view target over untouched")
+    void navHandlerKeepsTheView() {
+        MenuContext ctx = mock(MenuContext.class);
+        when(ctx.requireString(0)).thenReturn("push");
+        when(ctx.param(1)).thenReturn(Optional.of("other"));
+        when(ctx.param(2)).thenReturn(Optional.of("detail"));
+        when(ctx.params()).thenReturn(List.of("push", "other", "detail", "42"));
+        when(ctx.navigate(eq(NavigationMode.PUSH), any(NavEntry.class))).thenReturn(Done.NOW);
+
+        ActionTable table = tableOf(new BareMenu());
+        var handler = table.button("nav").orElseThrow().handler();
+        handler.handle(ctx, JdaMocks.button("menu:bare:nav", true));
+
+        ArgumentCaptor<NavEntry> target = ArgumentCaptor.forClass(NavEntry.class);
+        verify(ctx).navigate(eq(NavigationMode.PUSH), target.capture());
+        assertThat(target.getValue()).isEqualTo(new NavEntry("other", "detail", List.of("42")));
+    }
+
+    @Test
+    @DisplayName("back has no target, so it goes through the menu-only overload")
+    void navHandlerDelegatesBack() {
+        MenuContext ctx = mock(MenuContext.class);
+        when(ctx.requireString(0)).thenReturn("back");
+        when(ctx.navigate(NavigationMode.BACK, "")).thenReturn(Done.NOW);
+
+        ActionTable table = tableOf(new BareMenu());
+        var handler = table.button("nav").orElseThrow().handler();
+
+        assertThat(handler.handle(ctx, JdaMocks.button("menu:bare:nav", true))).isEqualTo(Done.NOW);
+        verify(ctx).navigate(NavigationMode.BACK, "");
     }
 
     @Test

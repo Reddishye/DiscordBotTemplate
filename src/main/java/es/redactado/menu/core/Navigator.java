@@ -41,7 +41,10 @@ final class Navigator {
     }
 
     /**
-     * Performs a navigation and shows the resulting view.
+     * Performs a navigation to a menu's home view.
+     *
+     * <p>Asks the target for its home entry rather than assuming {@code home}, because a
+     * menu is free to name its own starting view.
      *
      * @param ctx the context of the interaction that triggered the navigation
      * @param mode how to move
@@ -50,18 +53,65 @@ final class Navigator {
      * @throws UserFacingException if the target menu is not registered
      */
     CompletableFuture<Void> go(MenuContext ctx, NavigationMode mode, String targetMenuId) {
+        if (mode == NavigationMode.BACK) {
+            return back(ctx);
+        }
+        return apply(ctx, mode, lookupMenu(targetMenuId).home(ctx));
+    }
+
+    /**
+     * Performs a navigation to a named view.
+     *
+     * @param ctx the context of the interaction that triggered the navigation
+     * @param mode how to move
+     * @param target the view to show, ignored by {@link NavigationMode#BACK}
+     * @return a completed future; navigation is in-memory and never blocks
+     * @throws UserFacingException if the target menu is not registered
+     */
+    CompletableFuture<Void> go(MenuContext ctx, NavigationMode mode, NavEntry target) {
+        if (mode == NavigationMode.BACK) {
+            return back(ctx);
+        }
+        return apply(ctx, mode, target);
+    }
+
+    /**
+     * Shows the target and then records what happened to the history.
+     *
+     * <p><strong>The view being left is read before the new one is rendered, and pushed
+     * after it has been shown.</strong> Both halves matter, and in that order.
+     *
+     * <p>Reading first is what a menu with several views needs: it remembers which view it
+     * is showing, and rendering the target overwrites that memory before anyone asked.
+     *
+     * <p>Pushing afterwards is what keeps the history honest. A view that fails to render,
+     * such as one the menu does not know, must not leave a stack entry for a screen the
+     * user never saw, because the next Back would return to it. The cost is that a Back
+     * pressed while a slow view is still on its way finds an empty stack and lands on home.
+     */
+    private CompletableFuture<Void> apply(MenuContext ctx, NavigationMode mode, NavEntry entry) {
         return switch (mode) {
             case PUSH -> {
-                ctx.session().push(currentEntry(ctx));
-                yield show(ctx, homeOf(ctx, targetMenuId));
+                NavEntry from = whereWeAre(ctx);
+                yield show(ctx, entry).thenRun(() -> ctx.session().push(from));
             }
-            case REPLACE -> show(ctx, homeOf(ctx, targetMenuId));
-            case ROOT -> {
-                findSession(ctx).ifPresent(Session::clearStack);
-                yield show(ctx, homeOf(ctx, targetMenuId));
-            }
+            case REPLACE -> show(ctx, entry);
+            case ROOT ->
+                    show(ctx, entry).thenRun(() -> findSession(ctx).ifPresent(Session::clearStack));
             case BACK -> back(ctx);
         };
+    }
+
+    /**
+     * The view to remember as the one being left behind.
+     *
+     * <p>Asked of the menu being left, not of the context: a click names the button that
+     * was pressed, and that is {@code nav}, not the screen it was pressed on. A menu with
+     * several views overrides {@link Menu#currentView(MenuContext)} to say what is on
+     * screen; one with a single view is right by default.
+     */
+    private NavEntry whereWeAre(MenuContext ctx) {
+        return lookupMenu(ctx.menuId()).currentView(ctx);
     }
 
     private CompletableFuture<Void> back(MenuContext ctx) {
@@ -83,17 +133,8 @@ final class Navigator {
                 : sessions.find(ctx.messageId().getAsLong());
     }
 
-    private NavEntry currentEntry(MenuContext ctx) {
-        return new NavEntry(ctx.menuId(), ctx.action(), ctx.params());
-    }
-
     private NavEntry currentHome(MenuContext ctx) {
         return new NavEntry(ctx.menuId(), "home", List.of());
-    }
-
-    private NavEntry homeOf(MenuContext ctx, String targetMenuId) {
-        Menu target = lookupMenu(targetMenuId);
-        return target.home(ctx);
     }
 
     private Menu lookupMenu(String menuId) {

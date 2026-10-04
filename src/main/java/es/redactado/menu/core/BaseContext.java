@@ -365,6 +365,11 @@ public final class BaseContext implements MenuContext {
     }
 
     @Override
+    public CompletableFuture<Void> navigate(NavigationMode mode, NavEntry target) {
+        return navigator.go(this, mode, target);
+    }
+
+    @Override
     public MenuContext at(NavEntry entry) {
         return new BaseContext(
                 entry.menuId(),

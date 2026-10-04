@@ -55,6 +55,14 @@ class NavigatorAsyncRenderTest {
         Menu menu = mock(Menu.class);
         when(menu.id()).thenReturn("b");
         when(menu.home(any())).thenReturn(new NavEntry("b", "home", List.of()));
+        // A navigation that pushes asks the menu it is leaving which view is on screen,
+        // and a mocked menu answers null for a record.
+        when(menu.currentView(any()))
+                .thenAnswer(
+                        invocation -> {
+                            MenuContext ctx = invocation.getArgument(0);
+                            return new NavEntry(ctx.menuId(), ctx.action(), ctx.params());
+                        });
         when(menu.render(any())).thenReturn(pending);
         return menu;
     }
@@ -184,16 +192,21 @@ class NavigatorAsyncRenderTest {
     }
 
     @Test
-    @DisplayName("the session still records history when the render is async")
-    void historyRecordedBeforeRender() {
+    @DisplayName("the session records nothing while the view is still rendering")
+    void historyIsNotRecordedBeforeTheEditLands() {
         CompletableFuture<Container> pending = new CompletableFuture<>();
         Menu target = menuRendering(pending);
         ButtonInteractionEvent event = JdaMocks.button("menu:a:nav:push:b", true, MESSAGE, CLICKER);
 
         navigator(target).go(context(event), NavigationMode.PUSH, "b");
 
-        // History is updated synchronously, so an immediately following back works
-        // even while the pushed view is still rendering.
+        // Deliberate: a view that fails to render must not leave a stack entry for a
+        // screen the user never saw. The cost is that a Back pressed while a slow view is
+        // still on its way finds an empty stack and lands on home.
+        assertThat(sessions.getOrCreate(MESSAGE).depth()).isZero();
+
+        pending.complete(Container.of(TextDisplay.of("b")));
+
         assertThat(sessions.getOrCreate(MESSAGE).depth()).isEqualTo(1);
     }
 

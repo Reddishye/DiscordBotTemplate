@@ -45,6 +45,25 @@ public interface Menu {
     }
 
     /**
+     * The view this menu is showing right now, which is what going back returns to.
+     *
+     * <p>The default is the context's own action, and that is correct for a menu with one
+     * screen: the action that produced the view is the view.
+     *
+     * <p>A menu with several views reached by navigation buttons overrides this, because a
+     * click names the button that was pressed rather than the screen it was pressed on.
+     * Pushing the action would put an entry named {@code nav} on the stack, and going back
+     * would render an action the menu does not recognise. A multi-view menu remembers the
+     * view it is showing and returns it here.
+     *
+     * @param ctx the context of the interaction that is leaving the view
+     * @return the entry describing the view currently on screen
+     */
+    default NavEntry currentView(MenuContext ctx) {
+        return new NavEntry(id(), ctx.action(), ctx.params());
+    }
+
+    /**
      * Forces a look for this menu, whatever the guild and the user asked for.
      *
      * <p>A menu that reports a name here is rendered with that preset and no

@@ -30,6 +30,7 @@ public final class MessageKeys {
     public static final String ERROR_BAD_PARAM = "menu.error.bad_param";
     public static final String ERROR_UNKNOWN_MENU = "menu.error.unknown_menu";
     public static final String ERROR_UNKNOWN_NAV_MODE = "menu.error.unknown_nav_mode";
+    public static final String ERROR_UNKNOWN_VIEW = "menu.error.unknown_view";
 
     // menu.nav: navigation and session lifetime
     public static final String NAV_EXPIRED = "menu.nav.expired";
