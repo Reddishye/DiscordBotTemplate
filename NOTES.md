@@ -1850,3 +1850,64 @@ A failed loader fails the render with the loader's own exception; it is the rout
 that turns it into one localized sentence with a reference code, through
 `ErrorReply`. The render test therefore asserts the root cause, and the localized
 reply is proved in `MenuRouterOpenTest` and friends rather than being asserted twice.
+
+## Session state, and the profile example
+
+### Four methods, because the trap was in every handler
+
+`MenuContext` now has `sessionState`, `sessionStateOr`, `putSessionState` and
+`removeSessionState`. The first two read through `findSession`, so a read never creates a
+session; the last two go through `session`, so a write always ends with one.
+
+That split is the whole point, and it came from a bug the simple-menu examples shipped: both
+`CounterMenu` and `ServerInfoMenu` read state with `findSession`, found nothing on the first
+press because no session existed yet, and failed through the router with the framework's
+generic error. `CounterMenu` wrote with `findSession().orElseThrow()`, which is a
+`NoSuchElementException` in the first handler of a brand-new menu.
+
+Every `findSession`-then-`session` dance in main sources is gone: `AbstractMenu`'s pager
+write, `Pager`'s page read, `ShowcaseMenu`'s five writes and two reads, and both examples.
+`Trigger` carries the same four names so a handler reads the same either way.
+
+### Mocked contexts had to start running the real default methods
+
+Every test that mocks `MenuContext` now uses `CALLS_REAL_METHODS`. Mockito answers a default
+method with null, so `sessionStateOr(key, Integer.class, 0)` returned null and unboxed to an
+NPE the moment a mocked context rendered a pager. Fixtures that stub `session()` also stub
+`findSession()`, which is what lets the real default method find the session they installed.
+
+This is worth knowing for any interface with default methods: a mock does not run them, so a
+test that expects the default behaviour has to ask for it.
+
+### `refresh(ctx)` after a submission is a bug waiting for a user
+
+The profile example's two form handlers first called `refresh(ctx)` and every submission
+replied "That view is not available." A submission's action is `save_birth`, not a view, and
+`AbstractMenu#refresh` renders the context it is given. The simple DSL hides this because
+`Trigger.refresh()` renders the view that owns the action; a hand-written menu has to say
+`refresh(ctx.at(currentView(ctx)))` itself. It is now a named `refreshView` helper with the
+reason in its Javadoc, because `currentView` is not only for Back.
+
+### The blocking-call scan now has an exemption, and it is pinned
+
+`FakeProfileService` blocks with `Thread.sleep`, which is the point of it: the lesson is that
+the loader hands a blocking call to an executor. `NoBlockingCallsTest` now exempts exactly
+`menu/examples`, pinned by `theExemptionIsExactlyTheExamplesPackage`, and
+`theExemptionIsNotANoOp` asserts an exempt file really does block.
+
+Writing the delay as `LockSupport.parkNanos` would have passed the scan while blocking just
+as hard. That is evasion rather than compliance, and an exemption a reviewer can see is
+better than one nobody can.
+
+### Test-side lessons from this example
+
+- `any(Integer.class)` does not match a primitive `int` parameter; `anyInt()` does. With the
+  wrong matcher, `requireLong(0)` answered 0 and the role view looked up role 0.
+- A mocked `MenuContext` cannot parse params, so the render fixture stubs `requireLong` to do
+  the same arithmetic the real context does. The real parsing is proved by
+  `MenuRouterDispatchTest`, so nothing is claimed twice.
+- The fixture clicker is user 42, so a test that wants a press to pass the owner check must
+  make the message owner 42 too. Two of these tests failed on "This menu is not yours."
+- Waiting for a service counter is not waiting for a service call: the counter increments at
+  the start of the blocking call. The tests wait for the effect, or for the redraw the
+  handler's chain ends in.
