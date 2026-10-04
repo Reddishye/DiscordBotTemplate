@@ -1,9 +1,9 @@
 package es.redactado.menu.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -16,17 +16,21 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Proves the optional maintenance executor is really the one that runs the work.
+ * Proves the optional executor on a data cache is really the one that runs the load.
  *
  * <p>Asserting that the constructor stored it would prove nothing, and running the supplied
- * executor inline would hide the difference entirely: an inline executor and no executor at all
- * both appear to run on the calling thread. So the recorder below runs its work on a thread with
- * a name of its own, and the assertion is on the <em>name</em> of the thread that ran the task.
- * That is the only way to tell "used the pool" from "used the library default".
+ * executor inline would hide the difference entirely: an inline executor and no executor at
+ * all both appear to run on the calling thread. So the recorder runs its work on a thread with
+ * a name of its own, and the assertion is on the <em>name</em> of the thread that ran the
+ * loader. That is the only way to tell "used the pool" from "used the library default".
+ *
+ * <p>A session store deliberately has no such parameter, because nothing in it would ever run
+ * on one. Its own Javadoc says so; this test is the other half of that argument, showing the
+ * difference is not theoretical for the cache that does use the executor.
  */
 class MaintenanceExecutorTest {
 
-    private final List<ExecutorService> pools = new ArrayList<>();
+    private final List<ExecutorService> pools = new java.util.ArrayList<>();
 
     @AfterEach
     void shutdownPools() {
@@ -58,35 +62,39 @@ class MaintenanceExecutorTest {
     }
 
     @Test
-    @DisplayName("a data cache with no executor still loads, on the library default")
+    @DisplayName("a data cache with no executor loads on the library default pool")
     void dataCacheWithoutExecutorStillLoads() {
+        AtomicReference<String> loaderThread = new AtomicReference<>();
         DataCache<String, String> cache =
-                new DataCache<>(
+                new DataCache<String, String>(
                         DataCacheConfig.of(8, Duration.ofMinutes(1)),
-                        key -> CompletableFuture.completedFuture("v"));
+                        key -> {
+                            loaderThread.set(Thread.currentThread().getName());
+                            return CompletableFuture.completedFuture("v");
+                        });
 
         assertThat(cache.get("k").join()).isEqualTo("v");
+        assertThat(loaderThread.get())
+                .as("without a pool the load happens on the library default executor")
+                .contains("ForkJoinPool");
     }
 
     @Test
-    @DisplayName("a session store behaves identically with and without a maintenance pool")
-    void sessionStoreBehavesTheSameWithAPool() {
-        Recorder recorder = recorder();
-        SessionStore withPool = new SessionStore(SessionConfig.defaults(), recorder);
-        SessionStore withoutPool = new SessionStore(SessionConfig.defaults());
+    @DisplayName("an executor that rejects fails the read rather than losing it")
+    void aRejectingExecutorFailsTheRead() {
+        Executor rejecting =
+                task -> {
+                    throw new java.util.concurrent.RejectedExecutionException("full");
+                };
 
-        for (long message = 1; message <= 3; message++) {
-            withPool.getOrCreate(message);
-            withoutPool.getOrCreate(message);
-        }
-        assertThat(withPool.find(1L)).as("a session survives either way").isPresent();
-        assertThat(withoutPool.find(1L)).isPresent();
-        assertThat(withPool.size()).isEqualTo(withoutPool.size());
+        DataCache<String, String> cache =
+                new DataCache<String, String>(
+                        DataCacheConfig.of(8, Duration.ofMinutes(1)),
+                        key -> CompletableFuture.completedFuture("v"),
+                        rejecting);
 
-        withPool.close();
-        withoutPool.close();
-        assertThat(withPool.find(1L)).as("close discards everything").isEmpty();
-        assertThat(withoutPool.find(1L)).isEmpty();
+        assertThatThrownBy(() -> cache.get("k").join())
+                .hasRootCauseInstanceOf(java.util.concurrent.RejectedExecutionException.class);
     }
 
     private Recorder recorder() {
@@ -112,8 +120,8 @@ class MaintenanceExecutorTest {
         /**
          * The names of the threads tasks ran on.
          *
-         * <p>No sleeping: a load is only handed back to the caller once it has run, so by the
-         * time a join returns the task has already recorded its name.
+         * <p>No sleeping: a load is only handed back to the caller once it has run, so by
+         * the time a join returns the task has already recorded its name.
          */
         List<String> threadNames() {
             return List.copyOf(names);

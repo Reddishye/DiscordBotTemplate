@@ -73,7 +73,7 @@ class SessionStoreTest {
     void expiresAfterIdleTtl() {
         FakeTicker ticker = new FakeTicker();
         SessionConfig config = new SessionConfig(100, Duration.ofMinutes(30));
-        try (SessionStore store = new SessionStore(config, ticker, Runnable::run)) {
+        try (SessionStore store = new SessionStore(config, ticker)) {
             store.getOrCreate(1L);
 
             ticker.advance(Duration.ofMinutes(31));
@@ -87,7 +87,7 @@ class SessionStoreTest {
     void accessRenews() {
         FakeTicker ticker = new FakeTicker();
         SessionConfig config = new SessionConfig(100, Duration.ofMinutes(30));
-        try (SessionStore store = new SessionStore(config, ticker, Runnable::run)) {
+        try (SessionStore store = new SessionStore(config, ticker)) {
             store.getOrCreate(1L);
 
             for (int i = 0; i < 5; i++) {
@@ -102,14 +102,18 @@ class SessionStoreTest {
     }
 
     @Test
-    @DisplayName("size stays within the configured maximum")
+    @DisplayName("size stays within the configured maximum once pending work is drained")
     void respectsMaximumSize() {
         FakeTicker ticker = new FakeTicker();
         SessionConfig config = new SessionConfig(100, Duration.ofHours(1));
-        try (SessionStore store = new SessionStore(config, ticker, Runnable::run)) {
+        try (SessionStore store = new SessionStore(config, ticker)) {
             for (long id = 0; id < 1_000; id++) {
                 store.getOrCreate(id);
             }
+            // Drain first, because eviction is lazy and otherwise happens on Caffeine's
+            // own pool. This is the reason a host schedules cleanUp on a timer rather
+            // than leaving it to a background thread nobody asked for.
+            store.cleanUp();
 
             assertThat(store.size()).isLessThanOrEqualTo(100L);
         }

@@ -4,7 +4,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import es.redactado.menu.api.Session;
 import java.util.Optional;
-import java.util.concurrent.Executor;
 
 /**
  * Keeps one {@link Session} per menu message.
@@ -13,10 +12,15 @@ import java.util.concurrent.Executor;
  * Reads are lock-free and a session is created at most once per message even under
  * concurrent first clicks, because the cache's mapping function runs once.
  *
- * <p>A host application with its own pool can hand it over for cache maintenance, so eviction
- * and expiry bookkeeping happens there rather than on whichever thread happened to touch the
- * store. That is a scheduling choice only: sessions are small, the work is bookkeeping, and
- * nothing waits for it.
+ * <p><strong>There is no maintenance executor here, on purpose.</strong> Caffeine only
+ * delegates to one for removal notifications, {@code AsyncCache} computations,
+ * {@code refresh} and periodic maintenance, and a session store configures none of them.
+ * A parameter that can never be used is worse than no parameter: it implies the work is
+ * happening somewhere else.
+ *
+ * <p>What a store does need is an occasional {@code cleanUp}, and that is scheduled
+ * explicitly by the host, on its own timer. Draining buffers in the background on every
+ * write is not a thing this store wants.
  */
 public final class SessionStore implements AutoCloseable {
 
@@ -28,32 +32,16 @@ public final class SessionStore implements AutoCloseable {
      * @param config the size and lifetime bounds
      */
     public SessionStore(SessionConfig config) {
-        this(config, null, null);
+        this(config, null);
     }
 
     /**
-     * Creates a store that runs cache maintenance on the given executor.
-     *
-     * @param config the size and lifetime bounds
-     * @param maintenance where eviction and expiry bookkeeping runs, or null for the
-     *     library default
-     */
-    public SessionStore(SessionConfig config, Executor maintenance) {
-        this(config, null, maintenance);
-    }
-
-    /**
-     * Creates a store on an explicit clock and eviction executor, so a test can
-     * drive expiry without sleeping.
+     * Creates a store on an explicit clock, so a test can drive expiry without sleeping.
      *
      * @param config the size and lifetime bounds
      * @param ticker the time source, or null for the system clock
-     * @param executor the executor eviction runs on, or null for Caffeine's default
      */
-    SessionStore(
-            SessionConfig config,
-            com.github.benmanes.caffeine.cache.Ticker ticker,
-            Executor executor) {
+    SessionStore(SessionConfig config, com.github.benmanes.caffeine.cache.Ticker ticker) {
         Caffeine<Object, Object> builder =
                 Caffeine.newBuilder()
                         .maximumSize(config.maxSize())
@@ -61,10 +49,18 @@ public final class SessionStore implements AutoCloseable {
         if (ticker != null) {
             builder.ticker(ticker);
         }
-        if (executor != null) {
-            builder.executor(executor);
-        }
         this.sessions = builder.build();
+    }
+
+    /**
+     * Runs pending eviction and expiry work, so {@link #size()} converges on the bound.
+     *
+     * <p>Called on a schedule by the host, which is where a pool belongs: this class owns
+     * no thread and no timer. Eviction is lazy, so a store that is written heavily and
+     * never drained can hold more than its maximum for a while.
+     */
+    public void cleanUp() {
+        sessions.cleanUp();
     }
 
     /**

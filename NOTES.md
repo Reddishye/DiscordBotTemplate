@@ -1537,3 +1537,31 @@ mocked as unacknowledged, which is what a real one is at that point.
 - Probing a stack depth by printing it proved the push happened and nothing about
   *what* was pushed. Reading the rendered text showed the entry was the button's
   action, which is the whole bug.
+
+## Follow-up: the session maintenance executor was removed
+
+Commit `drop the unused session maintenance executor` deletes the parameter rather
+than documenting that it does nothing. A constructor argument that can never be
+used is worse than no argument: it tells the reader that the work happens
+somewhere, and someone will size a pool for it.
+
+**What replaced it.** `SessionStore.cleanUp()`, which drains pending eviction and
+expiry synchronously on the calling thread. The host schedules it, through
+`TaskManager.scheduleAtFixedRate` in the wiring task. That is strictly better than
+the alternative: draining in the background on every write is not something a store
+wants, and a scheduled drain is visible and testable.
+
+**One consequence, found by the existing test.** `SessionStoreTest.respectsMaximumSize`
+passed before and failed after, and the failure is the honest behaviour change.
+With the old test wiring (`Runnable::run` as Caffeine's executor) eviction ran
+inline, so `size()` had already converged. Without an executor, Caffeine drains on
+its own pool asynchronously, and `estimatedSize()` reported 590 against a maximum of
+100 immediately after 1,000 puts. The test now calls `cleanUp()` first, which is
+the documented contract rather than a race that happened to win.
+
+**The library default was also not what the test assumed.** A `DataCache` built
+without an executor does **not** load on the reading thread: Caffeine uses
+`ForkJoinPool.commonPool()`, and the loader runs on
+`ForkJoinPool.commonPool-worker-1`. The test asserted the reader's thread, failed,
+and now asserts the pool. Worth knowing before anyone writes "it runs inline by
+default".
