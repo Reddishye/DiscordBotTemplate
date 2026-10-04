@@ -1,5 +1,6 @@
 package es.redactado.service;
 
+import com.google.inject.Singleton;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -37,8 +38,14 @@ import org.slf4j.LoggerFactory;
  * <p>The service is thread-safe. {@link #init()} and {@link #shutdown()} are idempotent. Every
  * other method throws {@link IllegalStateException} if the service is not running.
  *
+ * <p><strong>Scoped as a singleton</strong> because the service registry resolves a service
+ * by class and inits that instance, while anything injecting this class would otherwise get
+ * a second, never-started copy: its executors would not exist and {@link #ioExecutor()}
+ * would throw. One instance, started once, shared by everyone who needs its pools.
+ *
  * <p>Requires Java 21 or later.
  */
+@Singleton
 public class TaskManager implements IService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TaskManager.class);
