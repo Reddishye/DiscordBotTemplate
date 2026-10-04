@@ -43,3 +43,8 @@ bin/
 .DS_Store
 
 *.env
+
+### Local agent and tool directories ###
+.omo/
+.opencode/
+.serena/
