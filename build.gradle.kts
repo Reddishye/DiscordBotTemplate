@@ -14,7 +14,7 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 
-java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+java { toolchain { languageVersion = JavaLanguageVersion.of(27) } }
 
 /**
  * Mockito's inline mock maker loads Byte Buddy's agent through the JDK's
