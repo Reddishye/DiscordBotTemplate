@@ -2,7 +2,7 @@ plugins {
     id("java")
     id("com.gradleup.shadow") version "9.6.1"
     id("application")
-    id("io.sentry.jvm.gradle") version "5.12.1"
+    id("io.sentry.jvm.gradle") version "6.18.0"
     id("com.diffplug.spotless") version "8.9.0"
 }
 
