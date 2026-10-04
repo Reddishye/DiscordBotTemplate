@@ -611,13 +611,27 @@ on the method.
 
 ### `Nav`
 
-Navigation buttons: `back`, `push`, `replace`, `root`. All four use the built-in
-`nav` action, so no menu declares or wires them, and the id carries the mode and
-target rather than a handler. Rendered in the preset's `SECONDARY` style; only
-`back()` takes its label from the bundles.
+Navigation buttons. All of them use the built-in `nav` action, so no menu
+declares or wires them, and the id carries the mode, the target menu and the
+target view rather than a handler. Rendered in the preset's `SECONDARY` style;
+only `back()` takes its label from the bundles.
+
+| Factory | Goes to | Mode |
+| --- | --- | --- |
+| `Nav.back()` | the previous view | back |
+| `Nav.view(action, label, params...)` | a view of this menu | push |
+| `Nav.swap(action, label, params...)` | a view of this menu | replace |
+| `Nav.push(menuId, label)` | another menu's home | push |
+| `Nav.replace(menuId, label)` | another menu's home | replace |
+| `Nav.root(menuId, label)` | another menu's home, clearing history | root |
+| `Nav.to(menuId, action, label, params...)` | a view of another menu | push |
+
+The id is `menu:<current>:nav:<mode>[:<targetMenu>[:<viewAction>[:<param>...]]]`,
+with the view and its params omitted when the button names only a menu, so an id
+written before views existed still resolves.
 
 ```java
-Row.of(Nav.back(), Nav.push("details", "Details"))
+Row.of(Nav.back(), Nav.view("details", "Details", id))
 ```
 
 ### `Pager<T>`

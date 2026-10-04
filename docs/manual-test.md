@@ -20,15 +20,16 @@ is the **stranger**, used in item 6.
 
 1. Trigger whatever slash command or message command opens the showcase.
 2. Press **Components**.
-3. Press **Presets**.
-4. Press **Confirmation**.
-5. Press **Modal form**.
-6. Press **Back** from each view in turn.
+3. Press **Back**, and confirm you are back on the home view rather than somewhere else.
+4. Press **Presets**, then **Back**.
+5. Press **Confirmation**, then **Back**.
+6. Press **Modal form**, then **Back**.
 
 **Expected.** Every view replaces the contents of the same message rather than
-posting a new one. Back returns to the previous view and the history is consumed,
-so the second Back lands on the home view. Nothing is posted twice, and no view
-shows an empty container.
+posting a new one, and **Back always returns to the view you came from**, not to the
+home view. Do step 3 twice: the first Back consumes one entry, the second lands on
+home, and the third is silent. Nothing is posted twice, and no view shows an empty
+container.
 
 ## 2. Compare the five built-in presets
 

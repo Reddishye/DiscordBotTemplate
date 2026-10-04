@@ -56,16 +56,16 @@ import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionE
  * components. A real menu has no exemption: it puts every user-facing string in a bundle
  * and reads it through {@link MenuContext#t}.
  *
- * <p>Views are chosen by {@link MenuContext#action()}, and moving between them is a
- * declared {@code go} action rather than {@code Nav.push}, because a navigation id
- * addresses a <em>menu</em> while a view is an action inside one. See NOTES.md.
+ * <p><strong>Views are chosen by {@link MenuContext#action()}</strong> and reached with
+ * {@link Nav#view(String, String, String...)}, so a navigation id names the view rather than
+ * only the menu and going back restores it.
  *
  * <p><strong>A click names an interaction, not a view.</strong> A button declared
- * {@code delete} runs while the component view is on screen, so the action alone cannot say
+ * {@code demo} runs while the component view is on screen, so the action alone cannot say
  * what is being looked at. The current view is therefore remembered in the session under
- * {@link #VIEW_KEY}, and an action that is not itself a view redraws whatever view is
- * remembered. Getting this wrong is not subtle: Back would return to a view named after the
- * button that was pressed, which renders the home view and looks like the history is broken.
+ * {@link #VIEW_KEY} and reported through {@link #currentView(MenuContext)}, which is what
+ * the navigator asks when it pushes. An action that is not itself a view redraws whatever
+ * view is remembered.
  */
 public final class ShowcaseMenu extends AbstractMenu {
 
@@ -87,14 +87,13 @@ public final class ShowcaseMenu extends AbstractMenu {
     /** Session key holding which view this message is showing. */
     public static final String VIEW_KEY = "showcase:view";
 
-    static final String HOME = "home";
-    static final String COMPONENTS = "components";
-    static final String PRESETS = "presets";
-    static final String CONFIRM = "confirm";
-    static final String MODAL = "modal";
+    public static final String HOME = "home";
+    public static final String COMPONENTS = "components";
+    public static final String PRESETS = "presets";
+    public static final String CONFIRM = "confirm";
+    public static final String MODAL = "modal";
 
-    static final String GO = "go";
-    static final String DEMO = "demo";
+    public static final String DEMO = "demo";
     static final String DELETE = "delete";
     static final String PICK_PRESET = "pick_preset";
     static final String OPEN_FORM = "open_form";
@@ -124,9 +123,8 @@ public final class ShowcaseMenu extends AbstractMenu {
 
     @Override
     protected void declare(ActionTable.Builder table) {
-        table.button(GO, Ack.DEFER_EDIT, this::goTo);
         table.button(DEMO, Ack.DEFER_EDIT, this::demoPressed);
-        table.button(DELETE, Ack.DEFER_EDIT, (ctx, event) -> showView(ctx, CONFIRM));
+        table.button(DELETE, Ack.DEFER_EDIT, (ctx, event) -> openView(ctx, CONFIRM));
         table.select(PICK_PRESET, Ack.DEFER_EDIT, this::presetPicked);
         table.button(OPEN_FORM, Ack.MODAL, this::openForm);
         table.modal(SUBMIT_FORM, Ack.DEFER_REPLY, this::formSubmitted);
@@ -185,14 +183,8 @@ public final class ShowcaseMenu extends AbstractMenu {
                         Text.of(
                                 "Each button below opens a view of this same menu. Nothing here"
                                         + " touches a database or a network."))
-                .add(
-                        Row.of(
-                                ActionButton.primary(GO, "Components").params(COMPONENTS),
-                                ActionButton.secondary(GO, "Presets").params(PRESETS)))
-                .add(
-                        Row.of(
-                                ActionButton.success(GO, "Confirmation").params(CONFIRM),
-                                ActionButton.danger(GO, "Modal form").params(MODAL)))
+                .add(Row.of(Nav.view(COMPONENTS, "Components"), Nav.view(PRESETS, "Presets")))
+                .add(Row.of(Nav.view(CONFIRM, "Confirmation"), Nav.view(MODAL, "Modal form")))
                 .add(Row.of(Nav.push(id(), "Reload the showcase")))
                 .build(ctx);
     }
@@ -230,7 +222,7 @@ public final class ShowcaseMenu extends AbstractMenu {
                                 items(ctx),
                                 PAGE_SIZE,
                                 item -> Field.of("Fake item " + item, "generated in memory")))
-                .add(Row.of(Nav.back(), ActionButton.secondary(GO, "Confirm").params(CONFIRM)))
+                .add(Row.of(Nav.back(), Nav.view(CONFIRM, "Confirm")))
                 .build(ctx);
     }
 
@@ -307,22 +299,28 @@ public final class ShowcaseMenu extends AbstractMenu {
 
     // ------------------------------------------------------------- handlers
 
-    /** Moves to another view of this menu, remembering where it came from. */
-    private CompletableFuture<Void> goTo(MenuContext ctx, ButtonInteractionEvent event) {
-        return showView(ctx, ctx.requireString(0));
+    /**
+     * Opens a view of this menu from a button, remembering where it came from.
+     *
+     * <p>Only two buttons need this: the danger button that leads to a confirmation and
+     * nothing else. Everything else navigates with {@link Nav#view}, which carries the view
+     * in its id, so this exists for a button whose id has no room for a destination.
+     */
+    private CompletableFuture<Void> openView(MenuContext ctx, String view) {
+        ctx.session().push(new NavEntry(ctx.menuId(), viewOf(ctx), ctx.params()));
+        return refresh(ctx.at(new NavEntry(ctx.menuId(), view, ctx.params())));
     }
 
     /**
-     * Renders a named view, pushing the current one so Back returns here.
+     * The view on screen, which is what going back must restore.
      *
-     * <p>Mirrors what the built-in page action does, and is needed because a navigation id
-     * addresses a menu rather than a view.
+     * <p>The framework default answers the action of the incoming click, which after a
+     * navigation button is {@code nav}; this menu remembers instead.
      */
-    private CompletableFuture<Void> showView(MenuContext ctx, String view) {
-        // The remembered view, not ctx.action(): the action is the button that was
-        // pressed, and putting that on the stack would send Back to a view named after it.
-        ctx.session().push(new NavEntry(ctx.menuId(), viewOf(ctx), ctx.params()));
-        return refresh(ctx.at(new NavEntry(ctx.menuId(), view, ctx.params())));
+    @Override
+    public NavEntry currentView(MenuContext ctx) {
+        String view = viewOf(ctx);
+        return new NavEntry(ctx.menuId(), view, ctx.params());
     }
 
     /** Stores the picked preset in this session and redraws. */
@@ -439,7 +437,7 @@ public final class ShowcaseMenu extends AbstractMenu {
     static final String FORM_FIELD = "form";
 
     /** Every view, in the order the home view offers them. */
-    static final List<String> VIEWS = List.of(HOME, COMPONENTS, PRESETS, CONFIRM, MODAL);
+    public static final List<String> VIEWS = List.of(HOME, COMPONENTS, PRESETS, CONFIRM, MODAL);
 
     static final String NAME = "name";
     static final String REASON = "reason";

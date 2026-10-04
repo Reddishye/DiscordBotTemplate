@@ -8,6 +8,9 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import es.redactado.menu.api.NavEntry;
+import es.redactado.menu.api.NavigationMode;
+import es.redactado.menu.api.Session;
 import es.redactado.menu.examples.ShowcaseMenu;
 import es.redactado.menu.preset.BuiltinPresets;
 import es.redactado.menu.preset.PresetRegistry;
@@ -51,38 +54,49 @@ class ShowcaseEndToEndTest {
     @DisplayName("home, components, a page, back, a preset and a form each edit exactly once")
     void theWholeWalkthrough() {
         ShowcaseMenu menu = new ShowcaseMenu(new PresetRegistry());
-        try (MenuRouter router = TestRouters.with(menu)) {
+        SessionStore sessions = new SessionStore(SessionConfig.defaults());
+        try (MenuRouter router = TestRouters.withSessions(sessions)) {
+            router.register("showcase", menu);
+
             ButtonInteractionEvent open = click("menu:showcase:nav:push:showcase", OWNER);
             assertThat(router.dispatchButton(open)).isTrue();
             assertOneEdit(open.getHook());
             assertThat(text(open.getHook())).contains("Menu showcase");
+            assertDepth(router, sessions, 1, "1 on the stack");
 
-            ButtonInteractionEvent components = click("menu:showcase:go:components", OWNER);
+            ButtonInteractionEvent components = click(view(ShowcaseMenu.COMPONENTS), OWNER);
             assertThat(router.dispatchButton(components)).isTrue();
             assertOneEdit(components.getHook());
             assertThat(text(components.getHook()))
                     .as("the pager starts on page one")
                     .contains("1/5")
                     .contains("Fake item 1");
+            assertDepth(router, sessions, 2, "2 on the stack");
 
             ButtonInteractionEvent next = click(pagerId("next"), OWNER);
             assertThat(router.dispatchButton(next)).isTrue();
             assertOneEdit(next.getHook());
             assertThat(text(next.getHook())).contains("2/5").contains("Fake item 6");
+            assertDepth(router, sessions, 2, "2 on the stack");
 
             ButtonInteractionEvent previous = click(pagerId("prev"), OWNER);
             assertThat(router.dispatchButton(previous)).isTrue();
             assertOneEdit(previous.getHook());
             assertThat(text(previous.getHook())).contains("1/5").contains("Fake item 1");
+            assertDepth(router, sessions, 2, "2 on the stack");
 
             ButtonInteractionEvent back = click("menu:showcase:nav:back", OWNER);
             assertThat(router.dispatchButton(back)).isTrue();
             assertOneEdit(back.getHook());
-            assertThat(text(back.getHook())).contains("Menu showcase");
+            assertThat(text(back.getHook()))
+                    .as("back lands on the view it was pushed from, not on home")
+                    .contains("Menu showcase");
+            assertDepth(router, sessions, 1, "1 on the stack");
 
-            ButtonInteractionEvent presets = click("menu:showcase:go:presets", OWNER);
+            ButtonInteractionEvent presets = click(view(ShowcaseMenu.PRESETS), OWNER);
             assertThat(router.dispatchButton(presets)).isTrue();
             assertOneEdit(presets.getHook());
+            assertDepth(router, sessions, 2, "2 on the stack");
 
             StringSelectInteractionEvent pick =
                     select("menu:showcase:pick_preset", OWNER, BuiltinPresets.MONOCHROME.name());
@@ -91,13 +105,15 @@ class ShowcaseEndToEndTest {
             assertThat(accent(pick.getHook()))
                     .as("the picked preset is what the next render uses")
                     .isEqualTo(BuiltinPresets.MONOCHROME.palette().accent());
+            assertDepth(router, sessions, 2, "2 on the stack");
 
-            ButtonInteractionEvent modalView = click("menu:showcase:go:modal", OWNER);
+            ButtonInteractionEvent modalView = click(view(ShowcaseMenu.MODAL), OWNER);
             assertThat(router.dispatchButton(modalView)).isTrue();
             assertOneEdit(modalView.getHook());
             assertThat(accent(modalView.getHook()))
                     .as("a later view keeps the previewed preset")
                     .isEqualTo(BuiltinPresets.MONOCHROME.palette().accent());
+            assertDepth(router, sessions, 3, "3 on the stack");
 
             // Unacknowledged, because Ack.MODAL means the router defers nothing and the
             // handler answers with the modal itself.
@@ -106,12 +122,27 @@ class ShowcaseEndToEndTest {
             assertThat(router.dispatchButton(openForm)).isTrue();
             awaitIdle(router);
             verify(openForm, timeout(AWAIT_MS)).replyModal(any());
+            assertDepth(router, sessions, 3, "3 on the stack");
 
             ModalInteractionEvent submit = submit(OWNER, "Ada", "Because it is fun");
             assertThat(router.dispatchModal(submit)).isTrue();
             assertOneEdit(submit.getHook());
             assertThat(text(submit.getHook())).contains("Ada").contains("Because it is fun");
+            assertDepth(router, sessions, 3, "3 on the stack");
+
+            // Three entries deep, so three backs walk all the way out.
+            ButtonInteractionEvent unwind = null;
+            for (int step = 0; step < 3; step++) {
+                unwind = click("menu:showcase:nav:back", OWNER);
+                assertThat(router.dispatchButton(unwind)).isTrue();
+                assertOneEdit(unwind.getHook());
+                assertDepth(router, sessions, 2 - step, (2 - step) + " on the stack");
+            }
+            assertThat(text(unwind.getHook()))
+                    .as("the last back leaves the showcase on its home view")
+                    .contains("Menu showcase");
         }
+        sessions.close();
     }
 
     @Test
@@ -121,7 +152,7 @@ class ShowcaseEndToEndTest {
         SessionStore sessions = new SessionStore(SessionConfig.defaults());
         try (MenuRouter router = TestRouters.withSessions(sessions)) {
             router.register("showcase", menu);
-            ButtonInteractionEvent components = click("menu:showcase:go:components", OWNER);
+            ButtonInteractionEvent components = click(view(ShowcaseMenu.COMPONENTS), OWNER);
             assertThat(router.dispatchButton(components)).isTrue();
             assertOneEdit(components.getHook());
 
@@ -145,7 +176,7 @@ class ShowcaseEndToEndTest {
     void confirmingDeletesOneItem() {
         ShowcaseMenu menu = new ShowcaseMenu(new PresetRegistry());
         try (MenuRouter router = TestRouters.with(menu)) {
-            ButtonInteractionEvent components = click("menu:showcase:go:components", OWNER);
+            ButtonInteractionEvent components = click(view(ShowcaseMenu.COMPONENTS), OWNER);
             assertThat(router.dispatchButton(components)).isTrue();
             assertOneEdit(components.getHook());
 
@@ -187,7 +218,7 @@ class ShowcaseEndToEndTest {
     void aStrangerIsRefused() {
         ShowcaseMenu menu = new ShowcaseMenu(new PresetRegistry());
         try (MenuRouter router = TestRouters.with(menu)) {
-            ButtonInteractionEvent foreign = click("menu:showcase:go:components", STRANGER);
+            ButtonInteractionEvent foreign = click(view(ShowcaseMenu.COMPONENTS), STRANGER);
             assertThat(router.dispatchButton(foreign)).isTrue();
             awaitIdle(router);
 
@@ -220,6 +251,17 @@ class ShowcaseEndToEndTest {
     /** The page button for the pager the component view draws. */
     private static String pagerId(String direction) {
         return "menu:showcase:page:" + direction + ":items:components";
+    }
+
+    /**
+     * The id of a navigation to a view of the showcase itself.
+     *
+     * <p>Built rather than written, because the whole point of the change is that the id
+     * carries the view and the router reads it back.
+     */
+    private static String view(String viewAction) {
+        return NavigationAction.buttonId(
+                "showcase", NavigationMode.PUSH, new NavEntry("showcase", viewAction, List.of()));
     }
 
     private static ButtonInteractionEvent click(String componentId, long user) {
@@ -257,6 +299,22 @@ class ShowcaseEndToEndTest {
     private static void assertOneEdit(InteractionHook hook) {
         verify(hook, timeout(AWAIT_MS))
                 .editOriginalComponents(any(MessageTopLevelComponent[].class));
+    }
+
+    /**
+     * The session history depth once a click has fully finished.
+     *
+     * <p>Waits for the router to release the message first, because the push happens after
+     * the edit and a depth read between the two would be a race rather than a result.
+     *
+     * @param because what this depth proves, so a failure says why it mattered
+     */
+    private static void assertDepth(
+            MenuRouter router, SessionStore sessions, int expected, String because) {
+        awaitIdle(router);
+        assertThat(sessions.find(MESSAGE).map(Session::depth).orElse(0))
+                .as(because)
+                .isEqualTo(expected);
     }
 
     private static void awaitIdle(MenuRouter router) {
