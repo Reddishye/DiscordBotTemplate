@@ -36,7 +36,7 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.19.1")
     implementation("io.github.cdimascio:dotenv-java:3.2.0")
 
-    implementation("ch.qos.logback:logback-classic:1.5.18")
+    implementation("ch.qos.logback:logback-classic:1.6.1")
     implementation("org.slf4j:slf4j-api:2.0.17")
     implementation("org.fusesource.jansi:jansi:2.4.2")
 
