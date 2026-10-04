@@ -22,10 +22,11 @@ import net.dv8tion.jda.api.utils.MarkdownSanitizer;
  * and a Javadoc example is not worth a hole in that rule.
  *
  * <pre>{@code
+ * // Labels come from a bundle, so the sample shows resolved text rather than a literal.
  * Container container = MenuBuilder.create("profile")
- *     .add(Text.of("## Hello"))
- *     .add(Field.of("Name", "John"))
- *     .add(Row.of(ActionButton.primary("edit", "Edit").icon(IconKey.EDIT)))
+ *     .add(Text.of(ctx.t(MessageKeys.FIELD_NOT_SET)))
+ *     .add(Field.of(labels.name(), "John"))
+ *     .add(Row.of(ActionButton.primary("edit", labels.edit()).icon(IconKey.EDIT)))
  *     .tone(Tone.ACCENT)
  *     .build(ctx);
  *

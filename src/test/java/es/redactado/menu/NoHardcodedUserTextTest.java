@@ -43,13 +43,36 @@ import org.junit.jupiter.api.Test;
  * net for new mistakes, not a substitute for reading the diff. Text meant for
  * developers, such as the message of an {@code IllegalArgumentException} or any log
  * line, is not user-facing and is deliberately out of scope.
+ *
+ * <p><strong>Exactly one package is exempt.</strong> {@code menu/examples} shows what the
+ * components look like, and an example that routed its own labels through a bundle would
+ * spend its lines demonstrating the bundle instead of the components. A real menu has no
+ * exemption. {@link #theExemptionIsExactlyTheExamplesPackage} pins the list to that one
+ * package, because an exemption that can grow silently is not an exemption, it is a hole.
  */
 class NoHardcodedUserTextTest {
 
     private static final Path MENU_ROOT = Path.of("src/main/java/es/redactado/menu");
 
+    /**
+     * The only directory the scan skips.
+     *
+     * <p>Asserted to hold exactly one entry, so adding a second package here fails the
+     * build rather than quietly widening what is unchecked.
+     */
+    private static final List<Path> EXEMPT = List.of(MENU_ROOT.resolve("examples"));
+
+    /**
+     * Calls whose <em>first</em> argument is text a user reads.
+     *
+     * <p>The menu component factories that take text first are here too: {@code Text},
+     * {@code Header} and {@code Field} all take the string to show as their first argument.
+     * The ones that take an action id first are not, because their text is the second
+     * argument and a second-argument rule would have to be written per factory.
+     */
     private static final String TEXT_CALLS =
             "\\b(?:ephemeral|sendMessage|reply|setContent|TextDisplay\\.of|Section\\.of"
+                    + "|Text\\.of|Header\\.of|Field\\.(?:of|editable|danger)"
                     + "|Button\\.(?:primary|secondary|success|danger|of))";
 
     private static final Pattern HARDCODED =
@@ -67,6 +90,38 @@ class NoHardcodedUserTextTest {
             Pattern.compile("\\bReplies\\.ephemeral\\s*\\([^,]+,\\s*\"([A-Za-z][^\"]*)\"");
 
     @Test
+    @DisplayName("the exemption is exactly the examples package, no more")
+    void theExemptionIsExactlyTheExamplesPackage() {
+        assertThat(EXEMPT)
+                .as("a second exemption needs a reason and a reviewer, not a quiet edit")
+                .containsExactly(MENU_ROOT.resolve("examples"));
+        assertThat(EXEMPT).allSatisfy(path -> assertThat(path).isDirectory());
+    }
+
+    @Test
+    @DisplayName("an exempt file really does carry literals, so the exemption is not a no-op")
+    void theExemptionIsUsedByTheExamples() throws IOException {
+        List<String> flagged = new ArrayList<>();
+        try (Stream<Path> files = Files.walk(EXEMPT.getFirst())) {
+            for (Path file : files.filter(path -> path.toString().endsWith(".java")).toList()) {
+                for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+                    if (HARDCODED.matcher(line).find() || EPHEMERAL_TEXT.matcher(line).find()) {
+                        flagged.add(file.getFileName() + ": " + line.strip());
+                    }
+                }
+            }
+        }
+
+        assertThat(flagged)
+                .as("the examples are exempt precisely because they contain such literals")
+                .isNotEmpty();
+    }
+
+    private static boolean isExempt(Path file) {
+        return EXEMPT.stream().anyMatch(exempt -> file.startsWith(exempt));
+    }
+
+    @Test
     @DisplayName("no English literal is passed straight to a user-facing call")
     void noHardcodedUserText() throws IOException {
         assertThat(MENU_ROOT).isDirectory();
@@ -76,7 +131,10 @@ class NoHardcodedUserTextTest {
 
         try (Stream<Path> files = Files.walk(MENU_ROOT)) {
             for (Path file :
-                    files.filter(path -> path.toString().endsWith(".java")).sorted().toList()) {
+                    files.filter(path -> path.toString().endsWith(".java"))
+                            .filter(path -> !isExempt(path))
+                            .sorted()
+                            .toList()) {
                 scanned++;
                 for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
                     if (HARDCODED.matcher(line).find() || EPHEMERAL_TEXT.matcher(line).find()) {
