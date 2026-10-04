@@ -3,6 +3,7 @@ package es.redactado.menu.examples;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -228,7 +229,7 @@ class SimpleExamplesEndToEndTest {
     // ------------------------------------------------------------------ helpers
 
     private static Container render(Menu menu, String view) {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         Session session = new Session();
         when(ctx.menuId()).thenReturn(menu.id());
         when(ctx.action()).thenReturn(view);

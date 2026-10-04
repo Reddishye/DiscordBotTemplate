@@ -1,6 +1,7 @@
 package es.redactado.menu.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -188,7 +189,7 @@ class SelectEndToEndTest {
 
     /** A context that renders with the default preset, built without a gateway. */
     private static MenuContext context() {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.menuId()).thenReturn("assign");
         when(ctx.preset()).thenReturn(BuiltinPresets.DEFAULT);
         return ctx;

@@ -3,6 +3,7 @@ package es.redactado.menu.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -83,7 +84,7 @@ class MsgTest {
 
     /** A context whose {@code t} resolves against the real bundles. */
     private static MenuContext context(Locale locale) {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.locale()).thenReturn(locale);
         when(ctx.t(any(String.class), any(Object[].class)))
                 .thenAnswer(

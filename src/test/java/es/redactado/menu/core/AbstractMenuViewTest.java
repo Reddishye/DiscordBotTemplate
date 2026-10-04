@@ -2,6 +2,7 @@ package es.redactado.menu.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.Render;
@@ -180,6 +181,6 @@ class AbstractMenuViewTest {
     }
 
     private static MenuContext context() {
-        return org.mockito.Mockito.mock(MenuContext.class);
+        return org.mockito.Mockito.mock(MenuContext.class, CALLS_REAL_METHODS);
     }
 }

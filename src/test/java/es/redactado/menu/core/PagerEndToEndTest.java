@@ -1,6 +1,7 @@
 package es.redactado.menu.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
@@ -155,7 +156,8 @@ class PagerEndToEndTest {
         }
 
         MenuContext contextStub() {
-            es.redactado.menu.api.MenuContext ctx = org.mockito.Mockito.mock(MenuContext.class);
+            es.redactado.menu.api.MenuContext ctx =
+                    org.mockito.Mockito.mock(MenuContext.class, CALLS_REAL_METHODS);
             net.dv8tion.jda.api.entities.User user =
                     org.mockito.Mockito.mock(net.dv8tion.jda.api.entities.User.class);
             org.mockito.Mockito.when(user.getEffectiveName()).thenReturn("Ada");

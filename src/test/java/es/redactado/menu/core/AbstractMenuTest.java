@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -107,7 +108,7 @@ class AbstractMenuTest {
     @DisplayName("refresh throws when the interaction is not acknowledged")
     void refreshNeedsAcknowledgement() {
         ButtonInteractionEvent unacknowledged = JdaMocks.button("menu:bare:nav", false);
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.event()).thenReturn(unacknowledged);
 
         AbstractMenu menu = new BareMenu();
@@ -121,7 +122,7 @@ class AbstractMenuTest {
     @DisplayName("showModal throws when the interaction is already acknowledged")
     void showModalNeedsUnacknowledged() {
         ButtonInteractionEvent acknowledged = JdaMocks.button("menu:bare:open", true);
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.event()).thenReturn(acknowledged);
 
         AbstractMenu menu = new BareMenu();
@@ -141,7 +142,7 @@ class AbstractMenuTest {
     @Test
     @DisplayName("the nav handler delegates a menu target as the target menu's home view")
     void navHandlerDelegates() {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.requireString(0)).thenReturn("push");
         when(ctx.param(1)).thenReturn(Optional.of("other"));
         when(ctx.navigate(eq(NavigationMode.PUSH), any(NavEntry.class))).thenReturn(Done.NOW);
@@ -160,7 +161,7 @@ class AbstractMenuTest {
     @Test
     @DisplayName("the nav handler hands a view target over untouched")
     void navHandlerKeepsTheView() {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.requireString(0)).thenReturn("push");
         when(ctx.param(1)).thenReturn(Optional.of("other"));
         when(ctx.param(2)).thenReturn(Optional.of("detail"));
@@ -179,7 +180,7 @@ class AbstractMenuTest {
     @Test
     @DisplayName("back has no target, so it goes through the menu-only overload")
     void navHandlerDelegatesBack() {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.requireString(0)).thenReturn("back");
         when(ctx.navigate(NavigationMode.BACK, "")).thenReturn(Done.NOW);
 

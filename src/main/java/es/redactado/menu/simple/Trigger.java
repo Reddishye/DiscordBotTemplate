@@ -4,6 +4,7 @@ import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.Msg;
 import es.redactado.menu.api.NavigationMode;
 import es.redactado.menu.api.UserFacingException;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.modals.Modal;
 
@@ -102,6 +103,50 @@ public abstract class Trigger {
      */
     public CompletableFuture<Void> back() {
         return ctx().navigate(NavigationMode.BACK, "");
+    }
+
+    /**
+     * Reads a state value from this message's session, without creating one.
+     *
+     * @param key the state key
+     * @param type the expected value type
+     * @param <T> the expected value type
+     * @return the value, or empty
+     */
+    public <T> Optional<T> sessionState(String key, Class<T> type) {
+        return ctx().sessionState(key, type);
+    }
+
+    /**
+     * Reads a state value from this message's session, falling back rather than creating one.
+     *
+     * @param key the state key
+     * @param type the expected value type
+     * @param fallback the value to answer with when there is none
+     * @param <T> the value type
+     * @return the value, or {@code fallback}
+     */
+    public <T> T sessionStateOr(String key, Class<T> type, T fallback) {
+        return ctx().sessionStateOr(key, type, fallback);
+    }
+
+    /**
+     * Stores a state value, creating the session on the first write.
+     *
+     * @param key the state key
+     * @param value the value, which must not be null
+     */
+    public void putSessionState(String key, Object value) {
+        ctx().putSessionState(key, value);
+    }
+
+    /**
+     * Removes a state value from this message's session.
+     *
+     * @param key the state key
+     */
+    public void removeSessionState(String key) {
+        ctx().removeSessionState(key);
     }
 
     /**

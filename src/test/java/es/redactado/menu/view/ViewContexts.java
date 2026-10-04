@@ -2,6 +2,7 @@ package es.redactado.menu.view;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -45,7 +46,7 @@ final class ViewContexts {
      * @return the context
      */
     static MenuContext forPreset(Preset preset, Locale locale) {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         User user = mock(User.class);
         Guild guild = mock(Guild.class);
         // A real session, not a mock: pagers read and write page state through it, and a
@@ -64,6 +65,7 @@ final class ViewContexts {
         when(ctx.guildId()).thenReturn("99");
         when(ctx.userId()).thenReturn("42");
         when(ctx.session()).thenReturn(session);
+        when(ctx.findSession()).thenReturn(java.util.Optional.of(session));
         when(ctx.t(anyString(), any(Object[].class)))
                 .thenAnswer(
                         call -> {

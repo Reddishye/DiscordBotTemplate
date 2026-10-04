@@ -103,8 +103,8 @@ public abstract class AbstractMenu implements Menu {
     private CompletableFuture<Void> changePage(MenuContext ctx, ButtonInteractionEvent event) {
         PageAction page = PageAction.fromContext(ctx);
         String key = PageAction.stateKey(page.pagerId());
-        int current = ctx.session().state(key, Integer.class).orElse(0);
-        ctx.session().putState(key, current + page.direction().delta());
+        int current = ctx.sessionStateOr(key, Integer.class, 0);
+        ctx.putSessionState(key, current + page.direction().delta());
 
         // This menu renders the view it is paging, so the target is itself. Going through
         // navigate instead would lose the view's action and params, and a pager inside a

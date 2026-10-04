@@ -170,7 +170,9 @@ public final class Pager<T> implements MenuComponent {
     }
 
     private int currentPage(MenuContext ctx) {
-        return ctx.session().state(stateKey(id), Integer.class).orElse(0);
+        // Read without creating: a view holding a pager would otherwise leave a session
+        // behind for every message that merely displayed it.
+        return ctx.sessionStateOr(stateKey(id), Integer.class, 0);
     }
 
     /**

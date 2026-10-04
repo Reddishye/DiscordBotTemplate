@@ -92,42 +92,32 @@ public final class CounterMenu {
 
     private static java.util.concurrent.CompletableFuture<Void> increment(
             es.redactado.menu.simple.Click click) {
-        write(click.ctx(), count(click.ctx()) + 1);
+        click.putSessionState(COUNT, click.sessionStateOr(COUNT, Integer.class, 0) + 1);
         return click.refresh();
     }
 
     private static java.util.concurrent.CompletableFuture<Void> decrement(
             es.redactado.menu.simple.Click click) {
-        write(click.ctx(), count(click.ctx()) - 1);
+        click.putSessionState(COUNT, click.sessionStateOr(COUNT, Integer.class, 0) - 1);
         return click.refresh();
     }
 
     /** Zeroes the count and leaves the confirmation, rather than staying on it. */
     private static java.util.concurrent.CompletableFuture<Void> reset(
             es.redactado.menu.simple.Click click) {
-        write(click.ctx(), 0);
+        click.removeSessionState(COUNT);
         return click.back();
     }
 
     /**
      * The count, or zero for a session that has never been touched.
      *
-     * <p>Read with {@code findSession}, because a session that does not exist yet is not an
-     * error: it is a counter nobody has pressed.
+     * <p>A read never creates a session, so merely opening this menu leaves none behind and
+     * the first press finds nothing rather than an empty map. That is the whole reason
+     * {@code sessionStateOr} exists: the old spelling was a find-then-session dance that a
+     * first press had to get right.
      */
     private static int count(MenuContext ctx) {
-        return ctx.findSession().flatMap(session -> session.state(COUNT, Integer.class)).orElse(0);
-    }
-
-    /**
-     * Stores the count.
-     *
-     * <p>Written with {@code session()} rather than {@code findSession()}, because that is
-     * the one that creates the session on first use. Reading with {@code findSession} and
-     * writing with {@code session} is the pair worth remembering: the first press on a fresh
-     * message is exactly the case where there is nothing to find.
-     */
-    private static void write(MenuContext ctx, int value) {
-        ctx.session().putState(COUNT, value);
+        return ctx.sessionStateOr(COUNT, Integer.class, 0);
     }
 }

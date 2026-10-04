@@ -3,6 +3,7 @@ package es.redactado.menu.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -180,7 +181,7 @@ class NavigationActionTest {
         }
 
         private MenuContext context(String componentId) {
-            MenuContext ctx = mock(MenuContext.class);
+            MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
             ComponentId parsed = ComponentId.decode(componentId).orElseThrow();
             List<String> params = parsed.params();
             when(ctx.params()).thenReturn(params);
@@ -264,7 +265,7 @@ class NavigationActionTest {
     }
 
     private static MenuContext contextFor(Menu menu, String action) {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.menuId()).thenReturn(menu.id());
         when(ctx.action()).thenReturn(action);
         when(ctx.params()).thenReturn(List.of());

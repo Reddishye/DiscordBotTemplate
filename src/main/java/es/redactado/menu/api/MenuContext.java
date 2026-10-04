@@ -222,6 +222,73 @@ public interface MenuContext {
     Optional<Session> findSession();
 
     /**
+     * Reads a state value, without creating a session.
+     *
+     * <p>The read side of the pair, and the safe one for an interaction that may be the
+     * first thing this message has ever seen. A session does not exist until something
+     * creates it, and {@link #session()} creating one as a side effect of a read would leave
+     * a message with an empty session hanging off it for as long as the store keeps it.
+     *
+     * <p>Empty when the key is absent, when the value is of another type, and when there is
+     * no session at all: from a caller's point of view those are the same answer, and the
+     * honest one.
+     *
+     * @param key the state key
+     * @param type the expected value type
+     * @param <T> the expected value type
+     * @return the value, or empty
+     * @see #sessionStateOr(String, Class, Object)
+     */
+    default <T> Optional<T> sessionState(String key, Class<T> type) {
+        return findSession().flatMap(session -> session.state(key, type));
+    }
+
+    /**
+     * Reads a state value, falling back rather than creating a session.
+     *
+     * <p>What most reads want, because a value that is not there yet is a normal state and
+     * not a reason to make one.
+     *
+     * @param key the state key
+     * @param type the expected value type
+     * @param fallback the value to answer with when there is none
+     * @param <T> the value type
+     * @return the value, or {@code fallback}
+     */
+    default <T> T sessionStateOr(String key, Class<T> type, T fallback) {
+        return findSession().flatMap(session -> session.state(key, type)).orElse(fallback);
+    }
+
+    /**
+     * Stores a state value, creating the session if this is the first write.
+     *
+     * <p>The write side, and the reason the read side exists: a first press on a fresh
+     * message has no session to write into, and a handler that read one with
+     * {@link #findSession()} would either fail or have to remember to create it.
+     *
+     * @param key the state key
+     * @param value the value, which must not be null
+     * @throws NullPointerException if the key or the value is null
+     */
+    default void putSessionState(String key, Object value) {
+        session().putState(key, value);
+    }
+
+    /**
+     * Removes a state value.
+     *
+     * <p>Creates the session if there is none, because a caller asking to remove something
+     * has already decided the session should exist, and silently doing nothing would hide a
+     * mistake in the key rather than fix it.
+     *
+     * @param key the state key
+     * @throws NullPointerException if the key is null
+     */
+    default void removeSessionState(String key) {
+        session().removeState(key);
+    }
+
+    /**
      * Moves to another view, using the session for history.
      *
      * <p>Targets the named menu's home view, which is all a menu with one screen needs.

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -499,7 +500,7 @@ class SimpleMenuEndToEndTest {
 
     /** A context that renders with the default preset, built without a gateway. */
     private static MenuContext context(String menuId, String view) {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.menuId()).thenReturn(menuId);
         when(ctx.action()).thenReturn(view);
         when(ctx.params()).thenReturn(List.of());

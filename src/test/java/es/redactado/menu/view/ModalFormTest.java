@@ -2,6 +2,7 @@ package es.redactado.menu.view;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -31,7 +32,7 @@ import org.junit.jupiter.api.Test;
 class ModalFormTest {
 
     private static MenuContext context() {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         when(ctx.menuId()).thenReturn("entry");
         when(ctx.preset()).thenReturn(BuiltinPresets.DEFAULT);
         return ctx;

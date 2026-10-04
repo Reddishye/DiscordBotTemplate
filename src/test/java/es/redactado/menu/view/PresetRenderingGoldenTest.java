@@ -3,6 +3,7 @@ package es.redactado.menu.view;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -312,7 +313,7 @@ class PresetRenderingGoldenTest {
     }
 
     private static MenuContext context(Preset preset) {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         User user = mock(User.class);
         when(user.getEffectiveName()).thenReturn("**Ada**");
         when(ctx.menuId()).thenReturn("profile");

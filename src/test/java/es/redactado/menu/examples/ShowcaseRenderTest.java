@@ -3,6 +3,7 @@ package es.redactado.menu.examples;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -91,7 +92,7 @@ class ShowcaseRenderTest {
      * fake items and the chosen preset live in the session both contexts must see.
      */
     private static MenuContext context(Preset preset, String view, Session session) {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         User user = mock(User.class);
         when(user.getEffectiveName()).thenReturn("Ada");
         when(user.getIdLong()).thenReturn(42L);

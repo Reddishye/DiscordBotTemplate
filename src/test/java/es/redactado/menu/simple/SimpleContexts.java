@@ -2,6 +2,7 @@ package es.redactado.menu.simple;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -49,7 +50,7 @@ final class SimpleContexts {
      */
     static MenuContext of(
             String menuId, String view, Preset preset, Locale locale, Session session) {
-        MenuContext ctx = mock(MenuContext.class);
+        MenuContext ctx = mock(MenuContext.class, CALLS_REAL_METHODS);
         User user = mock(User.class);
         when(user.getEffectiveName()).thenReturn("Ada");
         when(user.getIdLong()).thenReturn(42L);

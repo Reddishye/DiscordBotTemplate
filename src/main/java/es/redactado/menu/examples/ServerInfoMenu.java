@@ -104,9 +104,7 @@ public final class ServerInfoMenu {
             es.redactado.menu.simple.Pick pick) {
         List<String> values = pick.values();
         String section = values.isEmpty() ? OVERVIEW : values.getFirst();
-        // session() rather than findSession(): the first choice on a fresh message is exactly
-        // the case where there is no session to find yet.
-        pick.ctx().session().putState(SECTION, section);
+        pick.putSessionState(SECTION, section);
         return pick.refresh();
     }
 
@@ -120,9 +118,7 @@ public final class ServerInfoMenu {
     }
 
     private static String sectionOf(MenuContext ctx) {
-        return ctx.findSession()
-                .flatMap(session -> session.state(SECTION, String.class))
-                .orElse(OVERVIEW);
+        return ctx.sessionStateOr(SECTION, String.class, OVERVIEW);
     }
 
     /** One member of the server. */

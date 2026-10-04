@@ -138,7 +138,7 @@ public final class ShowcaseMenu extends AbstractMenu {
     @Override
     public CompletableFuture<Container> render(MenuContext ctx) {
         String view = viewOf(ctx);
-        ctx.session().putState(VIEW_KEY, view);
+        ctx.putSessionState(VIEW_KEY, view);
         // Every view renders through withPreset, so a preview chosen in one view is what
         // the next view draws too.
         MenuContext drawing = ctx.withPreset(activePreset(ctx));
@@ -157,7 +157,7 @@ public final class ShowcaseMenu extends AbstractMenu {
         if (VIEWS.contains(named)) {
             return named;
         }
-        return ctx.session().state(VIEW_KEY, String.class).filter(VIEWS::contains).orElse(HOME);
+        return ctx.sessionState(VIEW_KEY, String.class).filter(VIEWS::contains).orElse(HOME);
     }
 
     // ------------------------------------------------------------- the views
@@ -326,7 +326,7 @@ public final class ShowcaseMenu extends AbstractMenu {
     /** Stores the picked preset in this session and redraws. */
     private CompletableFuture<Void> presetPicked(
             MenuContext ctx, StringSelectInteractionEvent event) {
-        ctx.session().putState(PRESET_KEY, event.getValues().getFirst());
+        ctx.putSessionState(PRESET_KEY, event.getValues().getFirst());
         return refresh(ctx);
     }
 
@@ -338,7 +338,7 @@ public final class ShowcaseMenu extends AbstractMenu {
      * answer "unknown action" on click, which is the wrong lesson for a showcase.
      */
     private CompletableFuture<Void> demoPressed(MenuContext ctx, ButtonInteractionEvent event) {
-        ctx.session().putState(DEMO_KEY, ctx.requireString(0));
+        ctx.putSessionState(DEMO_KEY, ctx.requireString(0));
         return refresh(ctx);
     }
 
@@ -380,7 +380,7 @@ public final class ShowcaseMenu extends AbstractMenu {
     }
 
     private CompletableFuture<Void> editSubmitted(MenuContext ctx, ModalInteractionEvent event) {
-        ctx.session().putState(EDITED_KEY, ModalForm.read(event).getOrDefault(EDIT_VALUE, ""));
+        ctx.putSessionState(EDITED_KEY, ModalForm.read(event).getOrDefault(EDIT_VALUE, ""));
         return refresh(ctx.at(new NavEntry(ctx.menuId(), COMPONENTS, List.of())));
     }
 
@@ -388,7 +388,7 @@ public final class ShowcaseMenu extends AbstractMenu {
         List<String> remaining = new ArrayList<>(items(ctx));
         if (!remaining.isEmpty()) {
             remaining.removeLast();
-            ctx.session().putState(ITEMS_KEY, remaining);
+            ctx.putSessionState(ITEMS_KEY, remaining);
         }
         return ctx.navigate(NavigationMode.BACK, "");
     }
@@ -397,7 +397,7 @@ public final class ShowcaseMenu extends AbstractMenu {
 
     /** The preset this session is previewing, or the one the router resolved. */
     private Preset activePreset(MenuContext ctx) {
-        String chosen = ctx.session().state(PRESET_KEY, String.class).orElse(null);
+        String chosen = ctx.sessionState(PRESET_KEY, String.class).orElse(null);
         return chosen == null ? ctx.preset() : registry.getOrDefault(chosen);
     }
 
@@ -420,8 +420,8 @@ public final class ShowcaseMenu extends AbstractMenu {
 
     private static Map<String, String> answers(MenuContext ctx) {
         Map<String, String> found = new LinkedHashMap<>();
-        found.put(NAME, ctx.session().state(ANSWERS_KEY + ":" + NAME, String.class).orElse(""));
-        found.put(REASON, ctx.session().state(ANSWERS_KEY + ":" + REASON, String.class).orElse(""));
+        found.put(NAME, ctx.sessionStateOr(ANSWERS_KEY + ":" + NAME, String.class, ""));
+        found.put(REASON, ctx.sessionStateOr(ANSWERS_KEY + ":" + REASON, String.class, ""));
         found.entrySet().removeIf(entry -> entry.getValue().isEmpty());
         return found;
     }
