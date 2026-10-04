@@ -357,7 +357,7 @@ class MenuRouterDispatchTest {
             ExecutorService rejecting = mock(ExecutorService.class);
             doThrow(new RejectedExecutionException()).when(rejecting).execute(any(Runnable.class));
 
-            MenuRouter router = TestRouters.withExecutor(MenuExecutor.of(rejecting));
+            MenuRouter router = TestRouters.withExecutor(MenuExecutor.shared(rejecting));
             router.register("m", new SimpleMenu(instantHandler(), false));
             ButtonInteractionEvent event = clickFrom(1000L, CLICKER);
 

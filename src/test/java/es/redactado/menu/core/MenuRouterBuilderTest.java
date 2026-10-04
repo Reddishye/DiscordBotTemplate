@@ -45,7 +45,7 @@ class MenuRouterBuilderTest {
     @DisplayName("a caller-supplied executor is not closed by the router")
     void doesNotCloseSuppliedExecutor() {
         CountingExecutor service = new CountingExecutor();
-        MenuRouter router = MenuRouter.builder().executor(MenuExecutor.of(service)).build();
+        MenuRouter router = MenuRouter.builder().executor(MenuExecutor.shared(service)).build();
 
         router.close();
 

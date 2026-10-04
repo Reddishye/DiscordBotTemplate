@@ -2,9 +2,14 @@ package es.redactado.menu.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -121,6 +126,78 @@ class MenuExecutorTest {
 
         // The task was interrupted by close, so it still produces a result.
         assertThat(pending.join()).isEqualTo("late");
+    }
+
+    @Test
+    @DisplayName("a shared executor survives close, because the caller owns it")
+    void sharedCloseLeavesTheExecutorAlone() {
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        MenuExecutor shared = MenuExecutor.shared(pool);
+
+        shared.close();
+
+        assertThat(pool.isShutdown()).as("a borrowed pool must stay usable").isFalse();
+        assertThat(shared.supply(() -> "still here").join()).isEqualTo("still here");
+        pool.shutdownNow();
+    }
+
+    @Test
+    @DisplayName("a shared executor runs tasks on its own threads, not on menu-* ones")
+    void sharedRunsOnTheGivenPool() {
+        ExecutorService pool =
+                Executors.newSingleThreadExecutor(Thread.ofPlatform().name("pool-", 0).factory());
+        MenuExecutor shared = MenuExecutor.shared(pool);
+
+        AtomicReference<String> thread = new AtomicReference<>();
+        shared.run(() -> thread.set(Thread.currentThread().getName())).join();
+
+        assertThat(thread.get()).startsWith("pool-").doesNotStartWith("menu-");
+        pool.shutdownNow();
+    }
+
+    @Test
+    @DisplayName("supply and run both go through the shared executor")
+    void supplyAndRunUseTheSharedExecutor() {
+        ExecutorService pool =
+                Executors.newSingleThreadExecutor(Thread.ofPlatform().name("pool-", 0).factory());
+        MenuExecutor shared = MenuExecutor.shared(pool);
+        AtomicReference<Thread> supplied = new AtomicReference<>();
+        AtomicReference<Thread> ran = new AtomicReference<>();
+
+        String value =
+                shared.supply(
+                                () -> {
+                                    supplied.set(Thread.currentThread());
+                                    return "v";
+                                })
+                        .join();
+        shared.run(() -> ran.set(Thread.currentThread())).join();
+
+        assertThat(value).isEqualTo("v");
+        assertThat(supplied.get().getName()).startsWith("pool-");
+        assertThat(ran.get().getName()).startsWith("pool-");
+        pool.shutdownNow();
+    }
+
+    @Test
+    @DisplayName("a shared executor that rejects surfaces the rejection to the caller")
+    void sharedRejectionReachesTheCaller() {
+        ExecutorService rejecting = mock(ExecutorService.class);
+        doThrow(new RejectedExecutionException()).when(rejecting).execute(any(Runnable.class));
+        MenuExecutor shared = MenuExecutor.shared(rejecting);
+
+        assertThatThrownBy(() -> shared.execute(() -> {}))
+                .isInstanceOf(RejectedExecutionException.class);
+        assertThatThrownBy(shared.supply(() -> "x")::join)
+                .hasRootCauseInstanceOf(RejectedExecutionException.class);
+    }
+
+    @Test
+    @DisplayName("a null shared executor is refused at the call")
+    void nullSharedExecutorIsRefused() {
+        assertThatThrownBy(() -> MenuExecutor.shared(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("io");
     }
 
     @Test
