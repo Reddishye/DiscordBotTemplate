@@ -5,9 +5,7 @@ import es.redactado.menu.api.Menu;
 import es.redactado.menu.preset.Tone;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -49,7 +47,6 @@ public final class SimpleMenuBuilder<M> {
     private final Loader<M> loader;
     private final Declarations<M> declarations;
     private final List<View<M>> views = new ArrayList<>();
-    private final Map<String, String> actionToView = new HashMap<>();
     private Tone tone = Tone.ACCENT;
     private Duration loadTimeout = DEFAULT_LOAD_TIMEOUT;
     private boolean shared;
@@ -165,6 +162,28 @@ public final class SimpleMenuBuilder<M> {
     }
 
     /**
+     * Declares what a submitted modal does.
+     *
+     * <p>Menu-wide rather than per view: a form is opened by a button on one view and
+     * submitted while the message may well be showing another, so tying the handler to a view
+     * would be a claim the flow cannot keep.
+     *
+     * @param action the action name; the id the form carries
+     * @param handler what the answers run
+     * @return this builder
+     * @throws IllegalStateException if the action name is already used
+     * @throws IllegalArgumentException if the name cannot be used in an id
+     */
+    public SimpleMenuBuilder<M> onSubmit(String action, SubmitHandler handler) {
+        if (handler == null) {
+            throw new IllegalArgumentException(
+                    "Submission '" + action + "' in menu '" + id + "' needs a handler");
+        }
+        declarations.submit(action, handler);
+        return this;
+    }
+
+    /**
      * Builds the menu.
      *
      * <p>Every problem the framework can see is reported here, naming the view and the
@@ -192,6 +211,7 @@ public final class SimpleMenuBuilder<M> {
                 loadTimeout,
                 shared,
                 presetName,
-                Map.copyOf(actionToView));
+                declarations.actionToView(),
+                declarations.actions());
     }
 }

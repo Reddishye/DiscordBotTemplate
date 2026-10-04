@@ -6,6 +6,7 @@ import es.redactado.menu.view.Divider;
 import es.redactado.menu.view.Field;
 import es.redactado.menu.view.Header;
 import es.redactado.menu.view.Pager;
+import es.redactado.menu.view.Row;
 import es.redactado.menu.view.Text;
 import java.util.List;
 import java.util.function.Function;
@@ -116,6 +117,40 @@ final class Elements {
         @Override
         public MenuComponent render(Scope<M> scope) {
             return component.get();
+        }
+    }
+
+    /** A row of buttons or a link. */
+    record RowElement<M>(RowBuilder<M> row) implements Element<M> {
+        @Override
+        public MenuComponent render(Scope<M> scope) {
+            return row.render(scope.ctx());
+        }
+    }
+
+    /**
+     * A select menu, which gets a row of its own because a row holds either buttons or one
+     * select and never both.
+     */
+    record SelectElement<M>(String action, Msg placeholder, SelectSpec spec) implements Element<M> {
+        @Override
+        public MenuComponent render(Scope<M> scope) {
+            es.redactado.menu.view.SelectMenu select =
+                    es.redactado.menu.view.SelectMenu.of(action, placeholder.get(scope.ctx()));
+            for (SelectSpec.Option option : spec.options()) {
+                select =
+                        option.description() == null
+                                ? select.option(option.value(), option.label())
+                                : select.option(
+                                        option.value(), option.label(), option.description());
+            }
+            if (!spec.selected().isEmpty()) {
+                select = select.selected(spec.selected().toArray(new String[0]));
+            }
+            if (spec.max() > 0) {
+                select = select.range(spec.min(), spec.max());
+            }
+            return Row.of(select);
         }
     }
 

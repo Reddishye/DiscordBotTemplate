@@ -5,6 +5,7 @@ import es.redactado.menu.api.Loader;
 import es.redactado.menu.api.MenuComponent;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.NavEntry;
+import es.redactado.menu.api.NavigationMode;
 import es.redactado.menu.core.AbstractMenu;
 import es.redactado.menu.preset.Tone;
 import es.redactado.menu.view.MenuBuilder;
@@ -45,6 +46,7 @@ final class SimpleMenu<M> extends AbstractMenu {
     private final boolean shared;
     private final String presetName;
     private final Map<String, String> actionToView;
+    private final List<Action<M>> actions;
 
     SimpleMenu(
             String id,
@@ -54,7 +56,8 @@ final class SimpleMenu<M> extends AbstractMenu {
             Duration loadTimeout,
             boolean shared,
             String presetName,
-            Map<String, String> actionToView) {
+            Map<String, String> actionToView,
+            List<Action<M>> actions) {
         super(id);
         this.views = views;
         this.loader = loader;
@@ -63,12 +66,102 @@ final class SimpleMenu<M> extends AbstractMenu {
         this.shared = shared;
         this.presetName = presetName;
         this.actionToView = actionToView;
+        this.actions = actions;
     }
 
+    /**
+     * Declares every action the DSL collected, in one table.
+     *
+     * <p>Called once by the router at registration, from the framework's own {@code actions}
+     * method, so the table is immutable for the lifetime of the menu and the array of
+     * handlers is never touched again.
+     */
     @Override
     protected void declare(ActionTable.Builder table) {
-        // Nothing yet: the elements a simple menu declares are content, and content has no
-        // actions. The table is filled in by declareActions, once the DSL can hold actions.
+        for (Action<M> action : actions) {
+            switch (action.kind()) {
+                case BUTTON ->
+                        table.button(
+                                action.name(),
+                                action.ack(),
+                                (ctx, event) ->
+                                        ((ClickHandler) action.handler())
+                                                .handle(
+                                                        new Click(
+                                                                support(ctx),
+                                                                event,
+                                                                action.opensModal())));
+                case SELECT ->
+                        table.select(
+                                action.name(),
+                                action.ack(),
+                                (ctx, event) ->
+                                        ((PickHandler) action.handler())
+                                                .handle(new Pick(support(ctx), event.getValues())));
+                case MODAL ->
+                        table.modal(
+                                action.name(),
+                                action.ack(),
+                                (ctx, event) ->
+                                        ((SubmitHandler) action.handler())
+                                                .handle(
+                                                        new Submit(
+                                                                support(ctx),
+                                                                es.redactado.menu.view.ModalForm
+                                                                        .read(event))));
+            }
+        }
+    }
+
+    /**
+     * Finds a declared action by name.
+     *
+     * <p>The router only dispatches names that came out of this table, so the lookup cannot
+     * miss; falling back to the first action rather than throwing keeps a corrupt id from
+     * turning into an exception on the event thread.
+     */
+    private int actionIndex(String name) {
+        for (int i = 0; i < actions.size(); i++) {
+            if (actions.get(i).name().equals(name)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * What a trigger of this menu can do, built once per interaction.
+     *
+     * <p>Exists so {@link Trigger} can reach the protected members of the base class, which
+     * are the framework's single edit and modal paths, without knowing what this class is.
+     */
+    private Trigger.Support support(MenuContext ctx) {
+        return new Trigger.Support() {
+            @Override
+            public MenuContext ctx() {
+                return ctx;
+            }
+
+            @Override
+            public CompletableFuture<Void> refresh() {
+                return SimpleMenu.this.refresh(ctx.at(currentView(ctx)));
+            }
+
+            @Override
+            public CompletableFuture<Void> go(String menuId, String viewName) {
+                return ctx.navigate(NavigationMode.PUSH, new NavEntry(menuId, viewName, List.of()));
+            }
+
+            @Override
+            public CompletableFuture<Void> done() {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public void showModal(net.dv8tion.jda.api.modals.Modal modal) {
+                SimpleMenu.this.showModal(ctx, modal);
+            }
+        };
     }
 
     /**

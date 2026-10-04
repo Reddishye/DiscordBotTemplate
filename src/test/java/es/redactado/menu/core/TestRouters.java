@@ -15,23 +15,26 @@ import es.redactado.menu.preset.PresetRegistry;
  * wired with shared statics.
  *
  * <p>Each call creates its own store, so tests stay independent of execution order.
+ *
+ * <p>Public for the same reason as {@link JdaMocks}: the simple-menu tests drive a router
+ * too, and a second way of building one is a second set of defaults to keep in step.
  */
-final class TestRouters {
+public final class TestRouters {
 
     private TestRouters() {}
 
     /** A router over the real defaults. */
-    static MenuRouter create() {
+    public static MenuRouter create() {
         return MenuRouter.builder().build();
     }
 
     /** A router that runs handlers on the supplied executor. */
-    static MenuRouter withExecutor(MenuExecutor executor) {
+    public static MenuRouter withExecutor(MenuExecutor executor) {
         return MenuRouter.builder().executor(executor).build();
     }
 
     /** A router that keeps navigation history in the supplied store. */
-    static MenuRouter withSessions(SessionStore sessions) {
+    public static MenuRouter withSessions(SessionStore sessions) {
         return MenuRouter.builder().sessions(sessions).build();
     }
 
@@ -41,24 +44,24 @@ final class TestRouters {
      * <p>Tests that do not care about presets use this so they see the built-in default
      * rather than having to know what it is.
      */
-    static PresetResolver resolver() {
+    public static PresetResolver resolver() {
         return new PresetResolver(new PresetRegistry(), new InMemoryPresetPreferences(), false);
     }
 
     /** A router that resolves presets through the supplied resolver. */
-    static MenuRouter withPresets(PresetResolver presets) {
+    public static MenuRouter withPresets(PresetResolver presets) {
         return MenuRouter.builder().presets(presets).build();
     }
 
     /** A router over the real defaults with one menu registered. */
-    static MenuRouter with(Menu menu) {
+    public static MenuRouter with(Menu menu) {
         MenuRouter router = create();
         router.register(menu.id(), menu);
         return router;
     }
 
     /** A router that runs handlers on a supplied executor, with one menu registered. */
-    static MenuRouter with(MenuExecutor executor, Menu menu) {
+    public static MenuRouter with(MenuExecutor executor, Menu menu) {
         MenuRouter router = withExecutor(executor);
         router.register(menu.id(), menu);
         return router;
@@ -70,7 +73,7 @@ final class TestRouters {
      * <p>Safe to call on a router that was given shared components, because the router
      * knows which of them it owns and closes only those.
      */
-    static void close(MenuRouter router) {
+    public static void close(MenuRouter router) {
         router.close();
     }
 }

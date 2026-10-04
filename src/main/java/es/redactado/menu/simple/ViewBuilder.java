@@ -4,6 +4,7 @@ import es.redactado.menu.api.MenuComponent;
 import es.redactado.menu.api.Msg;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -160,6 +161,55 @@ public final class ViewBuilder<M> {
      */
     public ViewBuilder<M> section(Msg text, String thumbnailUrl) {
         elements.add(new Elements.SectionElement<>(text, thumbnailUrl));
+        return this;
+    }
+
+    /**
+     * A row of buttons, links or navigation.
+     *
+     * <p>A row holds at most five items and no select: {@link #select} gives the select a row
+     * of its own, which is how the component's own rule holds by construction rather than by
+     * the DSL policing it.
+     *
+     * @param row builds the row
+     * @return this builder
+     * @throws IllegalArgumentException if the row holds more items than a row can
+     */
+    public ViewBuilder<M> row(Consumer<RowBuilder<M>> row) {
+        RowBuilder<M> builder = new RowBuilder<>(viewName);
+        row.accept(builder);
+        builder.register(declarations);
+        elements.add(new Elements.RowElement<>(builder));
+        return this;
+    }
+
+    /**
+     * A select menu.
+     *
+     * <p>Menu-wide by action name, like every other action, and owned by this view for the
+     * purpose of knowing what a redraw should render.
+     *
+     * @param action the action name
+     * @param placeholder the text shown before anything is chosen, localized
+     * @param options builds the options
+     * @param handler what the choice runs
+     * @return this builder
+     */
+    public ViewBuilder<M> select(
+            String action, Msg placeholder, Consumer<SelectSpec> options, PickHandler handler) {
+        if (placeholder == null) {
+            throw new IllegalArgumentException(
+                    "Select '" + action + "' in view '" + viewName + "' needs a placeholder");
+        }
+        if (handler == null) {
+            throw new IllegalArgumentException(
+                    "Select '" + action + "' in view '" + viewName + "' needs a handler");
+        }
+        SelectSpec spec = new SelectSpec();
+        options.accept(spec);
+        declarations.select(viewName, action, handler);
+        ownedActions.add(action);
+        elements.add(new Elements.SelectElement<>(action, placeholder, spec));
         return this;
     }
 

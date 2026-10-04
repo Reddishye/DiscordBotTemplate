@@ -29,15 +29,19 @@ import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
  * <p>Nothing here touches a gateway. Every object is a Mockito mock, and only the
  * handful of methods the router actually calls are stubbed.
  *
+ * <p>Public because a test in another package needs the same fakes: a simple menu's
+ * end-to-end tests drive the router, and a second copy of these mocks would drift from this
+ * one.
+ *
  * <p>Stubs are always created before the {@code when(...)} that returns them.
  * Mockito cannot record a stub while another stubbing is in progress, so calling a
  * factory from inside a {@code when} argument fails.
  */
-final class JdaMocks {
+public final class JdaMocks {
 
     private JdaMocks() {}
 
-    static ButtonInteractionEvent button(String componentId, boolean acknowledged) {
+    public static ButtonInteractionEvent button(String componentId, boolean acknowledged) {
         return button(componentId, acknowledged, NO_MESSAGE, Long.MAX_VALUE);
     }
 
@@ -47,7 +51,7 @@ final class JdaMocks {
      * @param ownerId the interacting user, or {@link Long#MAX_VALUE} for a message
      *     with no interaction metadata, meaning it was sent directly to a channel
      */
-    static ButtonInteractionEvent button(
+    public static ButtonInteractionEvent button(
             String componentId, boolean acknowledged, long messageId, long ownerId) {
         InteractionHook hook = hook();
         MessageEditCallbackAction deferEdit = mock(MessageEditCallbackAction.class);
@@ -71,11 +75,11 @@ final class JdaMocks {
         return event;
     }
 
-    static ModalInteractionEvent modal(String modalId, boolean acknowledged) {
+    public static ModalInteractionEvent modal(String modalId, boolean acknowledged) {
         return modal(modalId, acknowledged, NO_MESSAGE, Long.MAX_VALUE);
     }
 
-    static ModalInteractionEvent modal(
+    public static ModalInteractionEvent modal(
             String modalId, boolean acknowledged, long messageId, long ownerId) {
         InteractionHook hook = hook();
         MessageEditCallbackAction deferEdit = mock(MessageEditCallbackAction.class);
@@ -104,12 +108,12 @@ final class JdaMocks {
      * a difference in behaviour shows up as a difference in the test rather than in the
      * mock.
      */
-    static StringSelectInteractionEvent select(
+    public static StringSelectInteractionEvent select(
             String componentId, boolean acknowledged, String... values) {
         return select(componentId, acknowledged, NO_MESSAGE, NO_OWNER, values);
     }
 
-    static StringSelectInteractionEvent select(
+    public static StringSelectInteractionEvent select(
             String componentId,
             boolean acknowledged,
             long messageId,
@@ -137,12 +141,12 @@ final class JdaMocks {
     }
 
     /** Message id meaning "this interaction has no menu message". */
-    static final long NO_MESSAGE = -1L;
+    public static final long NO_MESSAGE = -1L;
 
     /** User id meaning "the message carries no interaction metadata". */
-    static final long NO_OWNER = Long.MAX_VALUE;
+    public static final long NO_OWNER = Long.MAX_VALUE;
 
-    static Message message(long messageId, long ownerId) {
+    public static Message message(long messageId, long ownerId) {
         if (messageId == NO_MESSAGE) {
             return null;
         }
@@ -166,14 +170,14 @@ final class JdaMocks {
         return mock(Guild.class);
     }
 
-    static User user(long id) {
+    public static User user(long id) {
         User user = mock(User.class);
         when(user.getIdLong()).thenReturn(id);
         when(user.getId()).thenReturn(Long.toString(id));
         return user;
     }
 
-    static InteractionHook hook() {
+    public static InteractionHook hook() {
         InteractionHook hook = mock(InteractionHook.class);
         WebhookMessageCreateAction<Message> send = messageAction();
         WebhookMessageEditAction<Message> edit = editAction();

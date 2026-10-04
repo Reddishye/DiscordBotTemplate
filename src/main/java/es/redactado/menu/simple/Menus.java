@@ -34,7 +34,7 @@ public final class Menus {
      * navigation or paging. {@code home} is the one view that always exists, so a second view
      * by that name would be unreachable.
      */
-    private static final List<String> RESERVED = List.of("nav", "page", "home");
+    static final List<String> RESERVED = List.of("nav", "page", "home");
 
     private Menus() {}
 
