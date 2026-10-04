@@ -106,19 +106,27 @@ There is no `Components.container(...)` on either version. The view layer uses
 
 ## Java version
 
-Pinned to 21 in commit `pin java toolchain to 21`:
+**Superseded.** The baseline was Java 21, pinned in commit `pin java toolchain to
+21`. It is now **Java 27**, changed deliberately by the maintainer because the
+project depends on features of that version, and committed as `move toolchain to
+java 27 and update gradle wrapper`:
 
 ```kotlin
-java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+java { toolchain { languageVersion = JavaLanguageVersion.of(27) } }
 ```
 
-Confirmed by `javap`: `major version: 65`. Records, sealed hierarchies,
-pattern-matching `switch`, and virtual threads are all available, so
-`Executors.newVirtualThreadPerTaskExecutor()` backs `MenuExecutor` from T4 on, as
-section 3 requires for Java 21 or newer.
+Confirmed by `od` on a compiled class: `major version: 71`. The earlier
+`--release 21` compile check that T10b asked for was **dropped**, since the menu
+package may now be used on Java 27 and the check would only have proved it still
+compiled on something nobody targets.
 
-Note that Gradle itself still runs on the host JDK (24.0.2); the toolchain only
-governs compilation and test execution.
+What the change does *not* mean: nothing in the menu package uses a feature newer
+than Java 21. Its newest constructs are records, sealed interfaces, pattern
+matching in `switch`, `Optional` and virtual threads, all of which arrived by 21.
+The baseline moved because the project needs 27, not because the menus do.
+
+Gradle itself still runs on the host JDK; the toolchain governs compilation and
+test execution only.
 
 ## Serialization decision
 
@@ -1380,3 +1388,152 @@ One wrinkle worth recording: a mocked interaction cannot flip its own
 `isAcknowledged()` when the router defers it, so the test builds the event as
 already acknowledged. That is the honest model of what a handler receives, and it
 is the same stubbing the select and pager end-to-end tests use.
+
+## Step 2: the executor boundary
+
+### `MenuExecutor.of` was removed rather than left beside `shared`
+
+`MenuExecutor` had a package-private `of(ExecutorService)` that **owned** the
+executor it wrapped: `close()` shut it down. Adding `shared(Executor)`, which does
+not own, would have left two factories with the same purpose and opposite
+ownership rules, and picking the wrong one silently closes somebody else's pool.
+
+**Decision.** `of` is gone. One rule: `virtual()` owns what it created,
+`shared(Executor)` borrows. Its two callers moved to `shared`, which is also what
+they should have been using, since both were tests holding an executor the test
+itself created.
+
+### Caffeine does not use the configured executor for a plain store
+
+Worth recording, because the request assumed it would and the first test asserted
+it and **failed**. Caffeine delegates to the configured executor for removal
+notifications, `AsyncCache` computations, `refresh` and periodic maintenance
+(`Caffeine.executor` javadoc, and `BoundedLocalCache.notifyRemoval` /
+`scheduleDrainBuffers` at lines 432 and 1710 in the sources jar). A session store
+uses none of those: no listener, no refresh, no periodic maintenance. So
+`SessionStore(config, maintenance)` is accepted and honoured as configuration, and
+`MaintenanceExecutorTest` asserts the behaviour it can actually observe, that the
+store behaves identically either way, with a comment saying why there is no size
+assertion.
+
+**Two related facts found while asserting on Caffeine:**
+
+- `estimatedSize()` is approximate and counts entries whose eviction is pending,
+  so a store with `maximumSize` of 4 can report 50 after 50 puts. Asserting a
+  bound on it is not a test of anything.
+- A brand-new key can be the eviction victim, because its TinyLFU frequency is
+  zero. With `maximumSize` 4 and 50 sequential puts, the newest key is not
+  reliably present. "The last key is still there" is therefore not a safe
+  assertion either; the tests use a store that is not over capacity.
+
+### `DataCache` now really runs its loader on the given executor
+
+`AsyncCacheLoader.asyncLoad(key, executor)` receives the executor Caffeine was
+configured with, and the previous code ignored it, so the parameter was dead: a
+loader that returned a completed future left Caffeine nothing to schedule, and
+nothing ran on the pool at all.
+
+The loader is now invoked on that executor, which is the documented hook and the
+one that matters for a blocking loader: a synchronous repository call happens on
+the host's pool rather than on whichever thread read the cache. Verified
+non-vacuous by reverting the call and watching `aBlockingLoaderRunsOnTheGivenPool`
+fail.
+
+### A test bug that hid all of this for twenty minutes
+
+The first version of `MaintenanceExecutorTest` passed `recorder.pool()` to
+`DataCache` and then asserted on the recorder, so the recorder was never in the
+call path and the test could only ever pass by accident. Found by printing the
+executor Caffeine actually handed the loader. An executor-taking test has to pass
+the executor it asserts on.
+
+## T10c
+
+### Deleted: four types, and the one that looked deletable but was not
+
+| Deleted | Why nothing else used it |
+| --- | --- |
+| `view/SectionList` | superseded by `Pager`; its only other mention was a Javadoc example in `MenuComponent`, now pointing at `Pager` and `Confirm` |
+| `api/Renderable` | never referenced outside itself |
+| `api/NavigationAware` | never called by the router or the navigator. Section 5.4 offered wiring or removing; wiring an interface nobody needs would be worse than removing it, so it is removed |
+| `api/StateNotFoundException` | replaced by `UserFacingException` in T5 |
+
+**Kept, with the reason:**
+
+- **`ComponentLimitException`** looked like a candidate and is not: it is thrown by
+  `ValidationResult.throwIfInvalid` and asserted by `ViewEditorTest`. It is the
+  failure a limit violation produces, and it is what stops `ViewEditor` sending a
+  container Discord would reject.
+- **`ThumbnailComponent`** is not dead either. `MenuBuilderTest` uses it, and the
+  showcase needs it: a thumbnail is a section accessory, so it is the only way to
+  put one beside text in this package.
+- **Both `Replies.ephemeral` overloads and all four `Looks` methods** were checked
+  for callers and every one has them. Nothing was removed from either class.
+
+### `MenuExecutor.of` removed, and one rule left
+
+See Step 2 above.
+
+### View-to-view navigation needs a declared action, not `Nav.push`
+
+The brief asked for `Nav.push` buttons on the home view. A navigation id encodes
+`menu:<current>:nav:<mode>:<target>`, and the target is a **menu id**:
+`Navigator.homeOf` looks the menu up and renders `target.home(ctx)`, which is the
+`home` action. So `Nav.push("showcase", ...)` always lands on the showcase's home
+view and cannot reach `components`; a second menu per view would be the only way to
+make `Nav.push` work, and that contradicts "views chosen by `ctx.action()`".
+
+**Decision.** View-to-view moves use a declared `go` action whose parameter names
+the view, which is exactly the pattern the built-in `page` action already uses in
+`AbstractMenu#changePage`. `Nav.push` is kept where the target really is a menu,
+and `Nav.back()` is what every sub-view offers. Recorded rather than worked around
+in `core`, since changing `NavigationAction` to address a view would touch the
+router's navigation contract for every menu, not just this one.
+
+### A click names an interaction, not a view
+
+The first working version of the showcase pushed `ctx.action()` onto the session
+stack. That is the **clicked button's** action, so pressing `delete` pushed an
+entry named `delete`, and Back rendered it, found no such view, and fell through
+to home. It looked exactly like a broken history.
+
+**Decision.** The current view is remembered in the session under
+`showcase:view`, and an action that is not itself a view redraws the remembered
+one. The class Javadoc says why, because the mistake is easy to repeat: a menu with
+several views cannot know what is on screen from the click that arrived.
+
+Found by the end-to-end test, not by any render test: every view renders correctly
+in isolation, so only a walk with history can catch this.
+
+### The `examples` exemption was a no-op until the scan grew a rule
+
+`NoHardcodedUserTextTest` was extended with an exempt list of exactly one package,
+as asked, and with a test asserting the list holds exactly that one package. The
+second test I wrote first, "the examples really do contain such literals", failed:
+the scanner only matches a literal passed as the **first** argument, and every
+component factory takes the action id first.
+
+**Decision.** Rather than leave the exemption unexercised, the scan grew the
+factories that genuinely take text first: `Text.of`, `Header.of` and
+`Field.of/editable/danger`. That caught one real offender, a Javadoc example in
+`MenuBuilder` that passed `"Name"` as a field label, now written as
+`labels.name()` so the sample shows resolved text. The factories that take an
+action id first are still uncovered, and NOTES already records why a second
+argument rule was rejected as too broad.
+
+### A mocked interaction cannot acknowledge itself
+
+The showcase's modal button declares `Ack.MODAL`, so the router defers nothing and
+the handler answers with the modal. The first version of the test built the event
+with `isAcknowledged()` true, `showModal` refused with `IllegalStateException`, and
+the walkthrough failed with no visible cause. An event that opens a modal has to be
+mocked as unacknowledged, which is what a real one is at that point.
+
+### Two test-design mistakes worth recording
+
+- Asserting on the wrong event's hook after a loop of clicks: the captor held the
+  first edit, not the last. The variable holding the last click is the only one
+  that describes the state after the loop.
+- Probing a stack depth by printing it proved the push happened and nothing about
+  *what* was pushed. Reading the rendered text showed the entry was the button's
+  action, which is the whole bug.

@@ -23,13 +23,14 @@ The menu framework therefore lives under `es.redactado.menu`.
 
 | Item | Value |
 | --- | --- |
-| Build tool | Gradle 9.0.0 (Kotlin DSL, `build.gradle.kts`) |
-| Java version | pinned to 21 by `java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }` |
+| Build tool | Gradle 9.8.0 (Kotlin DSL, `build.gradle.kts`) |
+| Java version | **27**, pinned by `java { toolchain { languageVersion = JavaLanguageVersion.of(27) } }`. Nothing in the menu package uses a feature newer than 21; the baseline moved because the project needs 27 |
 | Formatter | Spotless 7.2.1, google-java-format 1.26.0, AOSP style, `reflowLongStrings`, `skipJavadocFormatting`, `formatAnnotations`, `removeUnusedImports` |
 | Packaging | Shadow 9.2.2 (`shadowJar`), Sentry 5.12.1, `application` plugin with main class `es.redactado.Main` |
 
-A formatter is already configured, so Spotless stays as-is. Java 21 supplies
-records, sealed hierarchies, pattern-matching `switch`, and virtual threads.
+A formatter is already configured, so Spotless stays as-is. Java 27 is the
+baseline; the features the menu package actually uses, records, sealed
+hierarchies, pattern-matching `switch` and virtual threads, all arrived by 21.
 
 ### 1.3 Dependencies
 
@@ -80,6 +81,34 @@ It also exposes `@Provides @Singleton Dotenv`.
 
 Bindings for the menu framework follow the same pattern: bind in `BotModule`,
 resolve instances through the `Injector`.
+
+### 1.4b Where the menu package gets its executors
+
+The menu package **must not import `es.redactado.service`**. It receives
+`java.util.concurrent.Executor` instances and nothing else, so it can be driven by
+the template's own pools, by a test's deterministic executor, or by
+`MenuExecutor.virtual()` with no wiring at all.
+
+The connection is made in the wiring task (W), outside the package:
+
+| Menu side | Host side | Ownership |
+| --- | --- | --- |
+| `MenuExecutor.shared(Executor io)` | `TaskManager.ioExecutor()` | borrowed; `close()` leaves it running |
+| `MenuExecutor.virtual()` | nothing | owned; `close()` shuts it down |
+| `new SessionStore(config, maintenance)` | `TaskManager.cpuExecutor()` | borrowed; the store never closes it |
+| `new DataCache(config, loader, executor)` | `TaskManager.cpuExecutor()` | borrowed; the loader runs there |
+
+`TaskManager` exposes `ioExecutor()` and `cpuExecutor()` and returns them as bare
+`Executor`, not `ExecutorService`, so a caller cannot shut down a pool it does not
+own. Both throw `IllegalStateException` when the manager is not running, which is
+the same contract as the manager's other methods: an accessor has no future to
+fail, so it fails at the call.
+
+Verified in the Caffeine sources: `Caffeine.executor(null)` throws
+`NullPointerException`, so an absent executor has to leave the builder
+unconfigured rather than be passed through. Unconfigured means
+`ForkJoinPool.commonPool()`, which is the behaviour these classes had before the
+parameter existed.
 
 ### 1.5 Event listeners
 
