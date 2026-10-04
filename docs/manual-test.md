@@ -201,21 +201,19 @@ template's real command conventions so it compiles as-is.
 
 ### 1. A command class
 
-Create `src/main/java/es/redactado/command/ShowcaseCommand.java`, implementing
-`BaseSlashCommand` exactly as `PingCommand` does, with `MenuService` injected:
+The class is already written and compiled, at
+`src/test/java/es/redactado/command/ShowcaseCommand.java`. Copy it into
+`src/main/java/es/redactado/command/` and add it to `SLASH_COMMANDS` in
+`src/main/java/es/redactado/config/Commands.java`:
 
 ```java
-package es.redactado.command;
+public static final List<Class<? extends BaseSlashCommand>> SLASH_COMMANDS =
+        List.of(PingCommand.class, ShowcaseCommand.class);
+```
 
-import com.google.inject.Inject;
-import es.redactado.command.type.BaseSlashCommand;
-import es.redactado.menu.examples.ShowcaseMenu;
-import es.redactado.service.MenuService;
-import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
-import net.dv8tion.jda.api.interactions.InteractionContextType;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
-import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+The command itself:
 
+```java
 public class ShowcaseCommand implements BaseSlashCommand {
 
     private final MenuService menuService;
@@ -229,23 +227,15 @@ public class ShowcaseCommand implements BaseSlashCommand {
     public SlashCommandData getCommandData() {
         return Commands.slash("showcase", "Open the menu showcase")
                 .setNSFW(false)
-                .setContexts(InteractionContextType.GUILD, InteractionContextType.PRIVATE);
+                .setContexts(InteractionContextType.GUILD, InteractionContextType.BOT_DM);
     }
 
     @Override
     public void handle(SlashCommandInteractionEvent event) {
-        // Registered once, not per click: registering the same id twice is an error.
         menuService.register(new ShowcaseMenu(menuService.presets()));
         menuService.open(event, "showcase", true);
     }
 }
-```
-
-Then add it to `SLASH_COMMANDS` in `src/main/java/es/redactado/config/Commands.java`:
-
-```java
-public static final List<Class<? extends BaseSlashCommand>> SLASH_COMMANDS =
-        List.of(PingCommand.class, ShowcaseCommand.class);
 ```
 
 ### 2. What this does, and what it does not
