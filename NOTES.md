@@ -1655,3 +1655,101 @@ framework's contract rather than a workaround.
 The end-to-end test walks the same path and additionally asserts the session
 stack depth after every click, which is what caught that paging, choosing a
 preset and opening a form must not move the history.
+
+## W: wiring the framework into the bot
+
+### The menu package never imports `es.redactado.service`, and a test now says so
+
+`MenuDependencyTest` enforces three rules separately, because they fail for different
+reasons:
+
+1. nothing under `menu` imports `es.redactado` at all;
+2. outside `menu`, the only importers of `es.redactado.service` are the integration
+   class and the two template files that already did so;
+3. every file either rule names actually exists, so an exemption cannot rot into a
+   hole with a name on it.
+
+**The first version of this scan was wrong in an instructive way.** It exempted
+`MenuService`, `MenuSettings` and `MenuListener`, and asserted that *only* those
+import `es.redactado.service`. That fails on `Main.java` and `config/Services.java`,
+which have imported it since before the menu system existed. The fix was not to add
+them to the exemption list, which would have made the rule "anything that already did
+it, plus anything new" and therefore worth nothing. It was to state the real rule:
+outside the menu package, the importers are the integration class **and** the
+pre-existing ones, so a fourth importer fails the build.
+
+The exemption list is also shorter than expected: `MenuService` and `MenuSettings`
+live *inside* `es.redactado.service` and cannot import it, so they need no exemption
+at all. Only the listener, which lives outside the package, appears in it.
+
+### `TaskManager` needed `@Singleton`, and that was a real bug waiting to happen
+
+`ServiceManager` resolves each service class with `injector::getInstance` and inits
+the result. Without a scope, Guice hands out a **new** `TaskManager` to anything that
+injects one, so `MenuService` would have received a copy that was never started and
+`ioExecutor()` would have thrown `IllegalStateException` during startup. Adding
+`@Singleton` to `TaskManager` is a one-word change to a pre-existing class and the
+minimum needed; `MenuService` is `@Singleton` for the same reason, since the listener
+injects it and must get the started instance.
+
+Verified non-vacuously: removing the annotation makes
+`menuServiceSeesTheStartedTaskManager` and `menuServiceIsScoped` fail. That test builds
+the injector the way the template does, starts the infrastructure services through
+`ServiceManager`, and then reaches for a pool *through the menu service*. The pool
+existing at all is the proof that the injected task manager is the started one.
+
+### Placement, and why
+
+| Code | Package |
+| --- | --- |
+| `MenuService`, `MenuSettings` | `es.redactado.service`, beside `IService` and `TaskManager` |
+| `MenuListener` | `es.redactado.command.handler`, beside `CommandListener` |
+
+Read first, as instructed: `Listeners.LISTENERS` holds `CommandListener` from
+`es.redactado.command.handler`, and `CommandRegister` instantiates listener classes
+from that list through the injector. Putting `MenuListener` anywhere else would have
+meant either a new package or a list that reaches across the tree. `MenuService`
+belongs with the services because it *is* one: `IService`, `dependsOn()`, `init()`,
+`shutdown()`.
+
+### Configuration follows Dotenv, so there is only one mechanism
+
+The template loads every setting through the injected `Dotenv` (`DatabaseManager`
+reads `DB_TYPE` and the rest that way), so `MenuSettings.from(Dotenv)` does the same
+rather than introducing `System.getenv` as a second path. The spec's fallback branch
+was therefore not needed, and the "if there is none" condition turned out false.
+
+Durations accept `ms`, `s`, `m`, `h` and a bare number of minutes, because
+`MENU_SESSION_IDLE_TTL=30` is what someone writes and failing on it would be pedantry.
+Every failure names the setting and echoes the value that was read.
+
+### The drain schedule needed a seam to be testable
+
+`MenuService.cleanUpSchedule()` is package-private and returns the `ScheduledFuture`,
+which is the only way to observe a schedule from outside. The test asserts it exists
+while running and `isCancelled()` after shutdown, using a 50 ms interval through
+`MenuSettings.withCleanUpInterval` so nothing waits a minute. Asserting on a sleep
+would have been the alternative and would have been slow and flaky.
+
+### Two of my own test bugs, both the same mistake
+
+- `setUp` created a `TaskManager` and never started it, so `MenuService.init` threw
+  "TaskManager is not running". The service depends on a *started* task manager; that
+  is not a detail the test can skip.
+- The dotenv stub took `KEY, VALUE` pairs while every call site passed one
+  `"KEY=VALUE"` string, so an odd-length array threw out of bounds instead of parsing.
+  A test helper whose contract differs from its call sites fails as a confusing
+  `ArrayIndexOutOfBoundsException` rather than as "wrong shape".
+
+### A Back during a slow load cannot happen, so the new ordering is safe
+
+Recorded because it was raised as a concern when the history started being written
+after the render rather than before.
+
+It cannot happen on the same message. The per-message re-entrancy guard claims the
+message for the whole of the first handler, from before the acknowledgement until its
+future completes, and drops every other interaction on that message while it is
+in flight. A Back is an interaction on that message. So the window in which a user
+could press Back while a view is still rendering does not exist; the ordering is
+therefore invisible to a user, and the only thing it buys is a stack that never
+remembers a view which failed to draw.

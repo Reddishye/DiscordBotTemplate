@@ -131,8 +131,10 @@ interaction convention: take the event on the JDA thread, hand the work to
 `Executors.newVirtualThreadPerTaskExecutor()`, acknowledge before doing work, and
 route failures to a single ephemeral error reply plus `Sentry.captureException`.
 
-The menu listener is registered the same way: one `MenuListener extends
-ListenerAdapter` added to `Listeners.LISTENERS`, delegating to `MenuRouter`.
+The menu listener is registered the same way and already is:
+`MenuListener extends ListenerAdapter` in this same package, listed in
+`Listeners.LISTENERS`, delegating to the router the `MenuService` owns. See the
+Wiring section.
 
 ### 1.6 Lifecycle and shutdown
 
@@ -176,6 +178,89 @@ The chain at run time is: `PresetResolver` picks a preset per interaction,
 `MenuRouter` puts it on the `MenuContext` as `ctx.preset()`, and every component reads
 that one value. `Looks` is the only class that converts a preset into a JDA value, so a
 mapping is changed in one place rather than in every component.
+
+## Wiring
+
+How the framework is attached to this template. The framework itself is unchanged by
+any of it: it takes an `Executor` and knows nothing about the bot.
+
+### Services
+
+| Service | Declared in | Depends on | What it owns |
+| --- | --- | --- | --- |
+| `TaskManager` | `Services.INFRASTRUCTURE_SERVICES` | nothing | the pools |
+| `MenuService` | `Services.INFRASTRUCTURE_SERVICES`, after `TaskManager` | `TaskManager` | router, sessions, presets, preferences, the preset watcher, the drain schedule |
+
+Both are started before JDA connects, so neither may touch `ShardManager`, and neither
+does.
+
+**Both are `@Singleton`, and that is load-bearing.** `ServiceManager` resolves each
+service class with `injector.getInstance` and inits whatever it gets back. Without a
+scope, a class injecting `TaskManager` would receive a *second*, never-started copy
+whose executors do not exist, and `MenuService.init` would throw on the first call.
+`MenuServiceTest.menuServiceSeesTheStartedTaskManager` proves it by building the
+injector the way the template does and reaching for a pool through the service.
+
+### Listener
+
+`MenuListener` lives in `es.redactado.command.handler`, beside `CommandListener`,
+because that is where the template keeps its `ListenerAdapter` implementations and
+where `Listeners.LISTENERS` expects them from. It is registered in
+`Listeners.LISTENERS` and injects `MenuService`.
+
+It is three overrides and nothing else: `onButtonInteraction`, `onModalInteraction`
+and `onStringSelectInteraction`, each delegating to the matching
+`MenuRouter.dispatch*`. It does not block and does not catch; an interaction the menu
+system does not own is left untouched for another listener.
+
+### Placement, and why
+
+| Code | Package | Reason |
+| --- | --- | --- |
+| framework | `es.redactado.menu.*` | no dependency on the template at all |
+| `MenuService`, `MenuSettings` | `es.redactado.service` | beside `IService` and `TaskManager`, the two things they are |
+| `MenuListener` | `es.redactado.command.handler` | beside `CommandListener`, which the listener list and the injector both already cover |
+
+`MenuDependencyTest` enforces the boundary: nothing under `menu` imports
+`es.redactado.*` at all, and outside it the only importers of `es.redactado.service`
+are `MenuListener` plus the two template files that already did so.
+
+### Configuration
+
+Read through `Dotenv`, the mechanism the template already uses, so there is one way
+to configure a bot rather than two.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `MENU_PRESETS_DIR` | `presets` | directory read for `*.json` preset files; a missing directory is not an error |
+| `MENU_SESSION_MAX_SIZE` | `50000` | how many menu messages are remembered at once |
+| `MENU_SESSION_IDLE_TTL` | `30m` | how long an untouched message keeps its history; accepts `ms`, `s`, `m`, `h`, or a bare number of minutes |
+| `MENU_USER_PRESETS_ENABLED` | `false` | whether a user's own choice may override their guild's |
+| `MENU_DEFAULT_PRESET` | `default` | which preset is used when nothing else says otherwise |
+
+A value that is present but unusable fails at startup with a message naming the
+setting, because a mistyped number in a `.env` file is otherwise invisible until a
+menu misbehaves hours later.
+
+### Shutdown order
+
+`ServiceManager.stopAll` stops in reverse init order, so:
+
+1. `MenuService.shutdown` cancels the drain schedule, closes the `PresetStore`, closes
+   the router, closes the `SessionStore`;
+2. `TaskManager.shutdown` then stops the pools the router was borrowing.
+
+The executor is never closed by the menu side: `MenuExecutor.shared` borrows
+`TaskManager.ioExecutor()`, and the service manager stops its owner in its own time.
+`shutdown` is idempotent, and it tolerates a task manager that has already stopped.
+
+### Opening a menu
+
+`MenuRouter.open(IReplyCallback, menuId, ephemeral)` answers any interaction that can
+be acknowledged: a slash command, a context menu, a component or modal of another
+system. An unknown id fails before anything is acknowledged, so the caller can still
+answer with a plain reply. Nothing else is provided and **no commands ship**: where a
+menu is opened from is a decision for the bot.
 
 ## Custom preset files
 
