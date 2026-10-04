@@ -1,6 +1,8 @@
 package es.redactado.menu.view;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -15,6 +17,7 @@ import es.redactado.menu.preset.Preset;
 import es.redactado.menu.preset.Tone;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -76,6 +79,7 @@ class PresetRenderingGoldenTest {
                                 ActionButton.danger("d", "D")))
                 .add(Row.of(ActionButton.primary("e", "E").icon(IconKey.BACK)))
                 .add(Row.of(LinkButton.of(LINK, "Docs").icon(IconKey.LINK)))
+                .add(Row.of(Nav.back(), Nav.view("details", "Details", "42")))
                 .add(Row.of(SelectMenu.of("pick", "Pick one").option("a", "A").option("b", "B")))
                 .add(Gallery.of(IMAGE))
                 .build(ctx);
@@ -137,9 +141,8 @@ class PresetRenderingGoldenTest {
     void buttonStylesFollowPreset(String name, Preset preset) {
         List<Button> buttons = buttons(render(preset));
 
-        // Row one has one button per role, row two a primary with a preset icon, row
-        // three the link. The indices below name those positions.
-        assertThat(buttons).hasSize(6);
+        // Four roles, a primary with a preset icon, the link, then back and a view target.
+        assertThat(buttons).hasSize(8);
         for (ButtonRole role : ButtonRole.values()) {
             assertThat(buttons.stream().filter(b -> b.getStyle() == preset.buttons().of(role)))
                     .as(
@@ -148,8 +151,13 @@ class PresetRenderingGoldenTest {
                     .isNotEmpty();
         }
         assertThat(buttons.get(5).getStyle())
-                .as("the last button is the link")
+                .as("the sixth button is the link")
                 .isEqualTo(ButtonStyle.LINK);
+        assertThat(buttons.get(6).getCustomId())
+                .as("and the two after it are navigation buttons")
+                .isEqualTo("menu:profile:nav:back");
+        assertThat(buttons.get(7).getCustomId())
+                .isEqualTo("menu:profile:nav:push:profile:details:42");
     }
 
     @ParameterizedTest(name = "{0}")
@@ -310,6 +318,18 @@ class PresetRenderingGoldenTest {
         when(ctx.menuId()).thenReturn("profile");
         when(ctx.preset()).thenReturn(preset);
         when(ctx.discordUser()).thenReturn(user);
+        when(ctx.locale()).thenReturn(Locale.ENGLISH);
+        // Nav.back takes its label from the bundles, and under a preset with no icons
+        // that label is the only thing Discord has to render the button with.
+        when(ctx.t(anyString(), any(Object[].class)))
+                .thenAnswer(
+                        call -> {
+                            Object[] all = call.getArguments();
+                            Object[] args = new Object[all.length - 1];
+                            System.arraycopy(all, 1, args, 0, args.length);
+                            return es.redactado.menu.core.Messages.standard()
+                                    .get(Locale.ENGLISH, (String) all[0], args);
+                        });
         return ctx;
     }
 
