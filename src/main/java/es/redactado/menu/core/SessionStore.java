@@ -12,6 +12,11 @@ import java.util.concurrent.Executor;
  * <p>Backed by Caffeine so entries expire on their own; nothing has to sweep them.
  * Reads are lock-free and a session is created at most once per message even under
  * concurrent first clicks, because the cache's mapping function runs once.
+ *
+ * <p>A host application with its own pool can hand it over for cache maintenance, so eviction
+ * and expiry bookkeeping happens there rather than on whichever thread happened to touch the
+ * store. That is a scheduling choice only: sessions are small, the work is bookkeeping, and
+ * nothing waits for it.
  */
 public final class SessionStore implements AutoCloseable {
 
@@ -24,6 +29,17 @@ public final class SessionStore implements AutoCloseable {
      */
     public SessionStore(SessionConfig config) {
         this(config, null, null);
+    }
+
+    /**
+     * Creates a store that runs cache maintenance on the given executor.
+     *
+     * @param config the size and lifetime bounds
+     * @param maintenance where eviction and expiry bookkeeping runs, or null for the
+     *     library default
+     */
+    public SessionStore(SessionConfig config, Executor maintenance) {
+        this(config, null, maintenance);
     }
 
     /**

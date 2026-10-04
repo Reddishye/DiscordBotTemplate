@@ -19,6 +19,10 @@ import org.slf4j.LoggerFactory;
  * fails is not remembered, so a transient outage does not poison the cache until
  * the TTL expires.
  *
+ * <p>The executor a cache is built with decides where Caffeine completes reads and runs
+ * eviction bookkeeping. It is optional: left out, the library default applies. It does not decide
+ * where the loader's own work runs, because the loader returns a future it has already arranged.
+ *
  * <p>Writes should go through {@link #invalidateAfter(CompletableFuture, Object)}
  * so the cached copy is dropped as soon as the write lands, whether it succeeded or
  * failed. Failing to invalidate after a write is the usual way a cache serves
@@ -35,11 +39,22 @@ public final class DataCache<K, V> {
     private final Function<K, CompletableFuture<V>> loader;
 
     /**
-     * Creates a cache that loads on the given executor.
+     * Creates a cache that leaves maintenance to the library default.
      *
      * @param config the size and lifetime bounds
      * @param loader produces the value for a key, asynchronously
-     * @param executor the executor loads and maintenance run on
+     */
+    public DataCache(DataCacheConfig config, Function<K, CompletableFuture<V>> loader) {
+        this(config, loader, null, null);
+    }
+
+    /**
+     * Creates a cache that completes reads and evicts on the given executor.
+     *
+     * @param config the size and lifetime bounds
+     * @param loader produces the value for a key, asynchronously
+     * @param executor where reads complete and eviction runs, or null for the library
+     *     default
      */
     public DataCache(
             DataCacheConfig config, Function<K, CompletableFuture<V>> loader, Executor executor) {
@@ -61,26 +76,56 @@ public final class DataCache<K, V> {
             com.github.benmanes.caffeine.cache.Ticker ticker) {
         this.loader = Objects.requireNonNull(loader, "loader");
         Caffeine<Object, Object> builder =
-                Caffeine.newBuilder()
-                        .maximumSize(config.maxSize())
-                        .expireAfterWrite(config.ttl())
-                        .executor(executor);
+                Caffeine.newBuilder().maximumSize(config.maxSize()).expireAfterWrite(config.ttl());
+        if (executor != null) {
+            // Caffeine rejects a null executor outright, so an absent one has to stay
+            // unconfigured rather than be passed through. Unconfigured means the library
+            // default, which is the behaviour this cache had before the parameter existed.
+            builder.executor(executor);
+        }
         if (ticker != null) {
             builder.ticker(ticker);
         }
         this.cache = builder.buildAsync((AsyncCacheLoader<K, V>) this::loadAsync);
     }
 
+    /**
+     * Loads one key on the executor Caffeine was configured with.
+     *
+     * <p>Caffeine hands the loader the executor back, and that is the documented place to
+     * start the work. Using it is what makes the parameter worth passing: a loader that
+     * returns an already-complete future leaves Caffeine nothing to schedule, so without this
+     * the configured executor would never run a task at all.
+     *
+     * <p>It matters most for a loader that blocks, such as a synchronous repository call:
+     * that call then happens on the pool the host application chose rather than on whichever
+     * thread happened to read the cache.
+     */
     private CompletableFuture<V> loadAsync(K key, Executor executor) {
-        return load(key);
+        CompletableFuture<V> loaded = new CompletableFuture<>();
+        try {
+            executor.execute(() -> startLoad(key, loaded));
+        } catch (RuntimeException rejected) {
+            loaded.completeExceptionally(rejected);
+        }
+        return loaded;
     }
 
-    private CompletableFuture<V> load(K key) {
+    /** Runs the loader and settles the future, so one rejection path serves both stages. */
+    private void startLoad(K key, CompletableFuture<V> loaded) {
         try {
-            return loader.apply(key);
-        } catch (RuntimeException e) {
-            LOG.debug("Loader threw for key {}", key, e);
-            return CompletableFuture.failedFuture(e);
+            loader.apply(key)
+                    .whenComplete(
+                            (value, error) -> {
+                                if (error != null) {
+                                    loaded.completeExceptionally(error);
+                                } else {
+                                    loaded.complete(value);
+                                }
+                            });
+        } catch (RuntimeException thrown) {
+            LOG.debug("Loader threw for key {}", key, thrown);
+            loaded.completeExceptionally(thrown);
         }
     }
 
