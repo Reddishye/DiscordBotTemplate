@@ -1565,3 +1565,93 @@ without an executor does **not** load on the reading thread: Caffeine uses
 `ForkJoinPool.commonPool-worker-1`. The test asserted the reader's thread, failed,
 and now asserts the pool. Worth knowing before anyone writes "it runs inline by
 default".
+
+## Follow-ups A and B
+
+### The session maintenance executor is gone, and `cleanUp` is the replacement
+
+Commit `drop the unused session maintenance executor`. Recorded in full above; the
+one-line version is that a constructor argument nothing can ever reach is worse
+than no argument. `SessionStore.cleanUp()` is now public and the host schedules
+it.
+
+### A menu needed to be asked which view it is showing
+
+`Menu#currentView(MenuContext)` is new, and it was not in the brief. It is
+**required** for the feature to work rather than added for symmetry.
+
+Pushing has to record the view the user is looking at. That is not
+`ctx.action()`: the click that navigates away arrives as a `nav` interaction, so
+pushing the action records an entry named `nav`, and Back renders it, the menu
+does not recognise it, and the user gets the unknown-view error instead of the
+screen they were on. Any menu with more than one screen has this problem, so the
+answer cannot live in the showcase.
+
+The default is `ctx.action()`, which is right for a menu with one screen. A
+multi-view menu overrides it, as `ShowcaseMenu` does with the view it remembers
+under `showcase:view`.
+
+**Cost worth knowing:** three existing tests mocked `Menu` and got `null` from a
+method they had never heard of, which surfaced as an NPE inside a
+`CompletableFuture` rather than as a missing stub. Any future test that mocks
+`Menu` must stub `currentView` if it exercises a push.
+
+### The view being left is read before the new one renders, and pushed after it
+
+That order is not a detail, and I got it wrong first.
+
+**Read before.** A menu that remembers its view does so by writing the key on
+every render, so rendering the target overwrites the memory before anyone asked
+what the previous view was. `apply` therefore captures `whereWeAre(ctx)` and only
+then renders.
+
+**Push after.** Required by the brief: a view that fails to render must not leave
+a stack entry for a screen the user never saw. `NavigatorAsyncRenderTest` had a
+test asserting the opposite, called `historyRecordedBeforeRender`, with the
+comment "history is updated synchronously". It is now
+`historyIsNotRecordedBeforeTheEditLands` and asserts depth zero while the render
+is pending and one once it lands.
+
+**The trade-off, stated plainly.** A Back pressed while a slow view is still on
+its way finds an empty stack, says the menu expired and lands on home. A
+navigation that renders in under a second is never affected, and the alternative
+is a Back that returns to a view that failed to draw.
+
+### `PresetForInteractionTest` had been passing for the wrong reason
+
+Its stub menu returned `CompletableFuture.completedFuture(null)` from `render`.
+With the old code the history was recorded before the edit, so a `null` container
+only ever produced an error nobody asserted on. Now the push waits for the edit, so
+the same `null` failed the navigation, the stack stayed empty and Back landed on
+the target instead of the source. The stub returns a real container.
+
+Worth recording as a class of bug: a test double that returns an impossible value
+is not neutral, it is a value that changes which branch of the code is exercised.
+
+### Three of my own mistakes, in one commit
+
+Recorded because each cost time and none would have been visible in a review of
+the final diff.
+
+1. **`subList(3, size)` on a short id.** A menu-only navigation id has two
+   segments, so asking for the params from the third threw. Now guarded.
+2. **Pushing the target menu's view.** `go` had the target in scope and I used it,
+   so a push recorded what the *destination* was showing. It has to be the menu
+   being left.
+3. **A blank menu id to force an "unknown menu" error.** `NavEntry` requires a
+   non-empty menu id, so I encoded a single space and let the lookup fail. That
+   produced a real `UserFacingException`, so it worked, and it was still nonsense:
+   `fromContext` now raises `ERROR_UNKNOWN_MENU` itself, which is the same message
+   for the same reason.
+
+### The showcase lost its own navigation workaround
+
+Commit `use view navigation in the showcase`. The `go` action, `goTo` and
+`showView` are gone; the home view's four buttons are `Nav.view`, and the danger
+button keeps a one-line `openView` because its id has no room for a destination.
+`VIEW_KEY` stays, because a menu that remembers its view is now part of the
+framework's contract rather than a workaround.
+
+The end-to-end test walks the same path and additionally asserts the session
+stack depth after every click, which is what caught that paging, choosing a
+preset and opening a form must not move the history.
