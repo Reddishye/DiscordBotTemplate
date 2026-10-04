@@ -95,8 +95,8 @@ The connection is made in the wiring task (W), outside the package:
 | --- | --- | --- |
 | `MenuExecutor.shared(Executor io)` | `TaskManager.ioExecutor()` | borrowed; `close()` leaves it running |
 | `MenuExecutor.virtual()` | nothing | owned; `close()` shuts it down |
-| `new SessionStore(config, maintenance)` | `TaskManager.cpuExecutor()` | borrowed; the store never closes it |
 | `new DataCache(config, loader, executor)` | `TaskManager.cpuExecutor()` | borrowed; the loader runs there |
+| `SessionStore.cleanUp()` | `TaskManager.scheduleAtFixedRate(...)` | the store owns no thread; draining is scheduled |
 
 `TaskManager` exposes `ioExecutor()` and `cpuExecutor()` and returns them as bare
 `Executor`, not `ExecutorService`, so a caller cannot shut down a pool it does not
@@ -107,8 +107,17 @@ fail, so it fails at the call.
 Verified in the Caffeine sources: `Caffeine.executor(null)` throws
 `NullPointerException`, so an absent executor has to leave the builder
 unconfigured rather than be passed through. Unconfigured means
-`ForkJoinPool.commonPool()`, which is the behaviour these classes had before the
-parameter existed.
+`ForkJoinPool.commonPool()`, which is the behaviour this class had before the
+parameter existed. Measured, not assumed: an unconfigured `DataCache` really does
+load on a `ForkJoinPool.commonPool-worker-N` thread.
+
+**A session store deliberately has no executor parameter.** Caffeine only delegates
+to one for removal notifications, `AsyncCache` computations, `refresh` and periodic
+maintenance, and a session store configures none of them, so the parameter could
+never be used. It was added by mistake and removed in commit `drop the unused
+session maintenance executor`. What the store needs is an occasional `cleanUp()`,
+which the host schedules on a timer; `SessionStoreTest.respectsMaximumSize` calls it
+before asserting, because `estimatedSize()` is approximate and eviction is lazy.
 
 ### 1.5 Event listeners
 
