@@ -160,8 +160,6 @@ public final class ShowcaseMenu extends AbstractMenu {
         return ctx.sessionState(VIEW_KEY, String.class).filter(VIEWS::contains).orElse(HOME);
     }
 
-    // ------------------------------------------------------------- the views
-
     private Container containerFor(MenuContext ctx, String view) {
         return switch (view) {
             case HOME -> homeView(ctx);
@@ -273,8 +271,6 @@ public final class ShowcaseMenu extends AbstractMenu {
         return builder.build(ctx);
     }
 
-    // ------------------------------------------------------------- components
-
     /** One option per preset, with its description clipped to what an option accepts. */
     private Row presetSelect() {
         SelectMenu select = SelectMenu.of(PICK_PRESET, "Pick a preset to preview");
@@ -296,8 +292,6 @@ public final class ShowcaseMenu extends AbstractMenu {
                         Section.of(
                                 ThumbnailComponent.of(image).render(ctx), TextDisplay.of(caption)));
     }
-
-    // ------------------------------------------------------------- handlers
 
     /**
      * Opens a view of this menu from a button, remembering where it came from.
@@ -392,8 +386,6 @@ public final class ShowcaseMenu extends AbstractMenu {
         }
         return ctx.navigate(NavigationMode.BACK, "");
     }
-
-    // ------------------------------------------------------------- fake state
 
     /** The preset this session is previewing, or the one the router resolved. */
     private Preset activePreset(MenuContext ctx) {

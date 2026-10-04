@@ -1,5 +1,7 @@
 package es.redactado.menu.api;
 
+import java.util.ArrayList;
+import java.util.List;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.section.Section;
@@ -12,23 +14,31 @@ public class Validator {
 
     private Validator() {}
 
-    /** Validate a built Container. Logs warnings, throws on hard limits. */
+    /**
+     * Validates a built container against Discord's documented limits.
+     *
+     * @param container the container a menu rendered
+     * @return the warnings and errors found; never null
+     */
     public static ValidationResult validate(Container container) {
-        var result = ValidationResult.builder();
+        List<String> warnings = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
         var children = container.getComponents();
 
         int childCount = children.size();
         if (childCount > Limits.MAX_CONTAINER_CHILDREN) {
-            result.error(
+            errors.add(
                     "Container has %d children, max is %d"
                             .formatted(childCount, Limits.MAX_CONTAINER_CHILDREN));
         } else if (childCount > Limits.WARN_CONTAINER_CHILDREN) {
-            result.warn(
+            warnings.add(
                     "Container has %d children (limit %d)"
                             .formatted(childCount, Limits.MAX_CONTAINER_CHILDREN));
         }
 
-        // Count special types that consume more visual space
+        // Counted only to make the debug line below say something useful: a container of
+        // ten sections and one of ten text lines use very different space and look identical
+        // in a child count.
         int sectionCount = 0;
         int actionRowCount = 0;
         for (var child : children) {
@@ -41,10 +51,16 @@ public class Validator {
                         .formatted(childCount, sectionCount, actionRowCount);
         LOG.debug("Container validation: {}", detail);
 
-        return result.build();
+        return new ValidationResult(warnings, errors);
     }
 
-    /** Convenience: validate and warn/throw. Returns container for chaining. */
+    /**
+     * Validates a container, logs its warnings and throws on its errors.
+     *
+     * @param container the container to check
+     * @return the same container, for chaining
+     * @throws ComponentLimitException if anything failed
+     */
     public static Container verify(Container container) {
         var result = validate(container);
         result.warnings().forEach(w -> LOG.warn("Menu validation warning: {}", w));

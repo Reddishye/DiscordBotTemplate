@@ -11,8 +11,8 @@ import net.dv8tion.jda.api.modals.Modal;
 /**
  * What a handler can do to the menu it was declared in.
  *
- * <p>Everything a simple-menu handler needs in order to move around, redraw and answer,
- * without the handler knowing anything about the router, the navigator or the session.
+ * <p>Everything a simple-menu handler needs to move around, redraw and answer, without
+ * the handler knowing anything about the router, the navigator or the session.
  *
  * <p>Each concrete trigger adds the one thing that is specific to how it was reached:
  * {@link Click} has the button event and can open a modal, {@link Pick} has the chosen

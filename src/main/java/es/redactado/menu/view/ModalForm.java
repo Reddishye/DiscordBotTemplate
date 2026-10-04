@@ -40,7 +40,7 @@ import net.dv8tion.jda.api.modals.Modal;
  *
  * <p><strong>A field is added by naming it.</strong> {@link #shortField} and
  * {@link #paragraph} register the field and return it, so the per-field settings that
- * follow configure the field that was just added. There is no separate add step, because
+ * follow configure the field the previous call registered. There is no separate add step, because
  * there is no ordering in which a field could be configured before it existed. The
  * per-field calls return the {@link Input} rather than the form, so the example keeps the
  * form in a local and calls {@link #build()} on that.

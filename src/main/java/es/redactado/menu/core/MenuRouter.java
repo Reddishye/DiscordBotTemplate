@@ -499,8 +499,8 @@ public final class MenuRouter implements AutoCloseable {
      * Swallows a duplicate click by deferring the edit.
      *
      * <p>The first click already owns the message and will produce the visible result,
-     * so the second one must not answer the user with an error; deferring simply closes
-     * it quietly. A select cannot defer an edit, so it is acknowledged instead, which is
+     * so the second one must not answer the user with an error; a deferred edit closes
+     * the interaction quietly. A select cannot defer an edit, so it is acknowledged instead, which is
      * the closest legal no-op.
      */
     private static void deferEdit(IReplyCallback event) {
@@ -535,10 +535,6 @@ public final class MenuRouter implements AutoCloseable {
             return true;
         }
         return owner.getIdLong() == event.getUser().getIdLong();
-    }
-
-    private static long messageIdOf(Message message) {
-        return message == null ? Incoming.NO_MESSAGE : message.getIdLong();
     }
 
     /**

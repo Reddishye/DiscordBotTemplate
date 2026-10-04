@@ -1,10 +1,13 @@
 package es.redactado.menu.api;
 
-/** Raised when a rendered container exceeds a documented Discord limit. */
+/**
+ * Raised when a rendered container exceeds a documented Discord limit.
+ *
+ * <p>The counts are in the message rather than in accessors, because nothing catches this to
+ * read them: the router turns it into one localized sentence with a reference code, and the
+ * reference in the log is what a maintainer needs.
+ */
 public class ComponentLimitException extends MenuException {
-
-    private final int actual;
-    private final int limit;
 
     /**
      * Creates the exception for an exceeded limit.
@@ -15,25 +18,5 @@ public class ComponentLimitException extends MenuException {
      */
     public ComponentLimitException(int actual, int limit, String detail) {
         super("Component limit exceeded: %d/%d: %s".formatted(actual, limit, detail));
-        this.actual = actual;
-        this.limit = limit;
-    }
-
-    /**
-     * The observed count.
-     *
-     * @return the actual count
-     */
-    public int actual() {
-        return actual;
-    }
-
-    /**
-     * The allowed count.
-     *
-     * @return the limit
-     */
-    public int limit() {
-        return limit;
     }
 }

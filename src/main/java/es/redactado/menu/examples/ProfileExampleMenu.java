@@ -20,7 +20,6 @@ import es.redactado.menu.view.Row;
 import es.redactado.menu.view.Text;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import net.dv8tion.jda.api.components.container.Container;
 
@@ -177,8 +176,6 @@ public final class ProfileExampleMenu extends AbstractMenu implements AutoClosea
         table.modal(SAVE_LINK, Ack.DEFER_EDIT, this::saveLink);
     }
 
-    // -------------------------------------------------------------- rendering
-
     @Override
     public CompletableFuture<Container> render(MenuContext ctx) {
         if (!VIEWS.contains(ctx.action())) {
@@ -286,8 +283,6 @@ public final class ProfileExampleMenu extends AbstractMenu implements AutoClosea
                 .build(ctx);
     }
 
-    // -------------------------------------------------------------- handlers
-
     private CompletableFuture<Void> askBirth(
             MenuContext ctx,
             net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent event) {
@@ -310,30 +305,48 @@ public final class ProfileExampleMenu extends AbstractMenu implements AutoClosea
     /**
      * Stores a new birth date and redraws.
      *
-     * <p>The write runs on the executor because the service blocks, and the cache key is
-     * dropped only once the write has settled. Invalidating first would leave a window in
-     * which a render reloaded the old value and cached it again.
+     * @param ctx the context of the submission
+     * @param event the JDA modal event
+     * @return a future completing when the write is stored and the view redrawn
      */
     private CompletableFuture<Void> saveBirth(
             MenuContext ctx, net.dv8tion.jda.api.events.interaction.ModalInteractionEvent event) {
-        Map<String, String> answers = ModalForm.read(event);
-        String birth = answers.getOrDefault("birth", "");
+        return write(ctx, () -> service.saveBirthBlocking(keyOf(ctx), answer(event, "birth")));
+    }
+
+    /**
+     * A write that goes to the service on the executor, then invalidates the cache entry and
+     * redraws.
+     *
+     * <p>The invalidation waits for the write to settle rather than happening before it.
+     * Invalidating first would leave a window in which a render reloaded the old value and
+     * cached it again, so the redraw would show the value the user had replaced a moment earlier.
+     *
+     * @param ctx the context of the interaction
+     * @param write the blocking call, already wrapped in its own future by {@code supply}
+     * @return a future completing when the write is stored and the view redrawn
+     */
+    private CompletableFuture<Void> write(
+            MenuContext ctx, java.util.function.Supplier<Object> write) {
         long key = keyOf(ctx);
-        return cache.invalidateAfter(
-                        executor.supply(() -> service.saveBirthBlocking(key, birth)), key)
+        return cache.invalidateAfter(executor.supply(write), key)
                 .thenCompose(ignored -> refresh(ctx));
     }
 
-    /** Stores a new link the same way, so the two writes cannot drift apart. */
+    /** One field of a submitted form, trimmed and never null. */
+    private static String answer(
+            net.dv8tion.jda.api.events.interaction.ModalInteractionEvent event, String field) {
+        return ModalForm.read(event).getOrDefault(field, "");
+    }
+
+    /** Stores a new link the same way a birth date is, so the two cannot drift apart. */
     private CompletableFuture<Void> saveLink(
             MenuContext ctx, net.dv8tion.jda.api.events.interaction.ModalInteractionEvent event) {
-        Map<String, String> answers = ModalForm.read(event);
-        String label = answers.getOrDefault("label", "");
-        String url = answers.getOrDefault("url", "");
-        long key = keyOf(ctx);
-        return cache.invalidateAfter(
-                        executor.supply(() -> service.addLinkBlocking(key, label, url)), key)
-                .thenCompose(ignored -> refresh(ctx));
+        return write(
+                ctx,
+                () ->
+                        service.addLinkBlocking(
+                                keyOf(ctx), answer(event, "label"), answer(event, "url")));
     }
 
     /** Removes the profile, which the confirmation view asked about first. */

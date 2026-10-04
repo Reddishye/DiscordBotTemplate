@@ -1975,3 +1975,32 @@ what happens next.
 20 of 20 runs passed. Scenario C's loader call count is the assertion that matters there: at
 most 50 calls to a service for 10,000 concurrent reads, which is the stampede the cache exists
 to prevent.
+
+## Style and dead-code audit
+
+Run as a report first, then each rule became a test: `SourceStyleTest` (names, TODO/FIXME/XXX,
+divider comments, filler words), `ApiJavadocTest` (public types in `api` and `preset`, public
+methods of the documented API classes, one `package-info` per package), `ClassSizeTest` (300
+lines, with the exceptions written down and checked for staleness). Method length stays a
+report, because a line count cannot tell a long linear check from a method that has grown four
+responsibilities.
+
+Removed as dead: `SimpleMenu.actionIndex`, `MenuRouter.messageIdOf`,
+`PresetLoader.resolveAll`, `ValidationResult.Builder` and its three unused factories,
+`ComponentLimitException.actual` and `limit`, and `ServerInfo.check`, which nothing called.
+
+Kept as deliberate public API: `ActionTable`'s count accessors, which are one family on a
+public type; `Session.MAX_DEPTH`, which bounds a stack a menu author cannot otherwise bound;
+and `Limits` in full, because a limit constant is a documented fact about Discord rather than
+an unused method.
+
+Dependencies added by this work, all in the allowed set: Caffeine and its JCache module for
+sessions and `DataCache`, Jackson Databind for preset JSON at the version JDA already
+resolves, JUnit 5 with AssertJ and Mockito for the test tree, and Byte Buddy's agent as a
+separate configuration because Mockito's inline mock maker self-attaches on JDK 27. Nothing was
+removed: every dependency in the file is either the template's own or one of those.
+
+Mechanical cleanups: `PresetLoader` (819 lines) split into `PresetSchema` for the JSON shape
+checks and `PresetDraft` for the parsed form and its resolution, both behaviour unchanged;
+`ProfileExampleMenu`'s two form submissions now share one write-and-invalidate path; the
+blocking-call exemption narrowed from a package to one file.

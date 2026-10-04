@@ -114,22 +114,6 @@ final class SimpleMenu<M> extends AbstractMenu {
     }
 
     /**
-     * Finds a declared action by name.
-     *
-     * <p>The router only dispatches names that came out of this table, so the lookup cannot
-     * miss; falling back to the first action rather than throwing keeps a corrupt id from
-     * turning into an exception on the event thread.
-     */
-    private int actionIndex(String name) {
-        for (int i = 0; i < actions.size(); i++) {
-            if (actions.get(i).name().equals(name)) {
-                return i;
-            }
-        }
-        return 0;
-    }
-
-    /**
      * What a trigger of this menu can do, built once per interaction.
      *
      * <p>Exists so {@link Trigger} can reach the protected members of the base class, which

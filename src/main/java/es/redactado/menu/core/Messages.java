@@ -23,8 +23,8 @@ import org.slf4j.LoggerFactory;
  * over.
  *
  * <p><strong>The JVM default locale cannot leak in.</strong> A bot whose host is set to
- * German must not silently start answering in German, and it must not answer in English
- * just because the host is German either. The no-fallback control makes the requested
+ * German must not start answering in German, and it must not answer in English
+ * because the host is German either. The no-fallback control makes the requested
  * locale the only one consulted, and the chain is explicit: the exact tag, then the
  * bare language, then English.
  *
