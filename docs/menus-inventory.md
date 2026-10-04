@@ -1,9 +1,12 @@
 # Menu System Inventory
 
-Reference document for the menu framework port. It records what the target
-template provides, what the source menu tree contains, and where the two do not
-line up. Every JDA statement below was verified against the sources jar of the
-exact JDA version this template depends on.
+Reference document for the menu framework. Sections 1 and 2 describe what the
+template provides and what JDA actually does; section 3 records what was ported
+from the source menu tree and what was deliberately not; section 3.6 is the
+declarative DSL. Every JDA statement was verified against the sources jar of the
+exact JDA version this template depends on, and every framework claim against the
+code as it stands. The reasoning behind the choices is in
+`docs/design-decisions.md`, and what is still open is in `NOTES.md`.
 
 ## 1. Target template
 
@@ -79,8 +82,10 @@ a single `BotModule extends AbstractModule` created in `Main.run()`.
 `DatabaseManager` singleton, and every class listed in `Database.REPOSITORIES`.
 It also exposes `@Provides @Singleton Dotenv`.
 
-Bindings for the menu framework follow the same pattern: bind in `BotModule`,
-resolve instances through the `Injector`.
+The menu framework follows the same pattern and adds two bindings:
+`MenuService`, a Guice `@Singleton` owning the router, and `MenuListener`, which
+`Listeners.LISTENERS` asks the injector for. `TaskManager` is a `@Singleton` as
+well, because a second one would own a second set of pools.
 
 ### 1.4b Where the menu package gets its executors
 
@@ -126,7 +131,7 @@ Listeners are discovered from the static list `es.redactado.config.Listeners.LIS
 result with `ShardManager.addEventListener`. Slash commands that also extend
 `ListenerAdapter` are appended from `CommandRegister.getListeners()`.
 
-The only current entry is `CommandListener`, which shows the template's
+The command entry is `CommandListener`, which shows the template's
 interaction convention: take the event on the JDA thread, hand the work to
 `Executors.newVirtualThreadPerTaskExecutor()`, acknowledge before doing work, and
 route failures to a single ephemeral error reply plus `Sentry.captureException`.
@@ -150,12 +155,16 @@ and `ServiceManager.stopAll()`. Services are declared in
 - `INFRASTRUCTURE_SERVICES`, started before JDA connects
 - `BUSINESS_SERVICES`, started after the first `ReadyEvent`
 
-The menu runtime needs to close its executor, its session cache, its data
-cache, and the preset file watcher. Because `Main.shutdown()` already delegates
-to `ServiceManager.stopAll()`, the conservative wiring is a single
-`MenuRuntime implements IService` registered in `INFRASTRUCTURE_SERVICES`, so the
-existing shutdown hook closes everything in reverse initialisation order without
-touching `Main`.
+The menu runtime needs to close its executor, its session store and its preset
+watcher, and it needs to be reachable from a command. It is therefore
+`es.redactado.service.MenuService`, an `IService` registered in
+`INFRASTRUCTURE_SERVICES` after `TaskManager`: it starts before JDA connects,
+builds the `MenuRouter` with the executors `TaskManager` owns, schedules the
+session store's drain, and closes in `shutdown()`. `Main.shutdown()` already
+delegates to `ServiceManager.stopAll()`, so the existing shutdown hook closes it in
+reverse initialisation order without touching `Main`. It touches neither
+`ShardManager` nor the Discord API, which is what an infrastructure service is
+required not to do.
 
 ### 1.6b Package dependency direction
 
@@ -375,7 +384,7 @@ Two cycles had to be broken. `Limits` moved from `view` to `api`, because
 Javadoc link. Removing the dead `AbstractMenu.renderValidated` is what actually
 cleared `core` -> `view`, since it was the only user of `view.Validator` there.
 
-### 1.7 Target file tree
+### 1.7 File tree
 
 ```
 src/main/java/es/redactado/
@@ -392,8 +401,8 @@ src/main/resources/
   logback.xml
 src/test/java/es/redactado/
   TestStackTest.java
-src/test/java/es/redactado/menu/view/
-  MenuBuilderTest.java
+  menu/                           the scan tests, the end-to-end tests, the
+                                  concurrency stress class
 src/main/java/es/redactado/menu/
   api/                            Menu, MenuContext, MenuComponent, Ack,
                                    ActionTable, ButtonAction, ModalAction,
@@ -444,15 +453,19 @@ and `CommandListener` (dispatch), neither of which provides an async repository.
 
 ### 1.8 Test infrastructure
 
-`tasks.test` uses `useJUnitPlatform()`. Two JVM settings are required, both
-explained in `NOTES.md`:
+`tasks.test` uses `useJUnitPlatform()`. Two JVM settings are required, both for
+the toolchain rather than for the tests:
 
 - `testRuntimeOnly("org.junit.platform:junit-platform-launcher")`, because
   Gradle's test executor loads the launcher reflectively and its absence fails
   the task with `Failed to load JUnit Platform`.
 - `-javaagent:${mockitoAgent.asPath}` pointing at `byte-buddy-agent`, because
   Mockito's inline mock maker otherwise self-attaches and prints
-  `Mockito is currently self-attaching` on every test JVM start on Java 21.
+  `Mockito is currently self-attaching` on every test JVM start on Java 27.
+
+A third setting is the `stress` tag, which is excluded unless `-PrunStress` is
+passed: the concurrency stress class measures wall-clock percentiles and should not
+fail a build for being slow.
 
 `src/test/java/es/redactado/TestStackTest.java` proves the stack: four tests
 covering interface mocking, interaction verification, virtual threads, and the
@@ -667,9 +680,8 @@ Carried over from the source, and each one contradicts a rule of the plan:
   types extend `ActionRowChildComponent` and `SectionAccessoryComponent`, and
   the hierarchies are disjoint, so every call threw `ClassCastException`. The
   source bot never hit this because `ProfileMenu` builds JDA components directly
-  and never instantiates these three classes. **Fixed in T1b** by splitting the
-  render contract into `MenuComponent`, `RowItem`, and `Accessory`. Detailed in
-  `NOTES.md`.
+  and never instantiates these three classes. **Fixed** by splitting the render
+  contract into `MenuComponent`, `RowItem`, and `Accessory`.
 - `ActionButton#render` called `Button.of(style, id, emoji)` when the label was
   empty, but that overload requires a non-null emoji. Removing the `"⬜"`
   placeholder turned a cosmetic default into a `NullPointerException`. **Fixed
@@ -687,12 +699,12 @@ These are already correct and stay unchanged:
 - `MAX_CUSTOM_ID_LENGTH = 100`
 - `MAX_MEDIA_GALLERY_ITEMS = 10`
 
-### 3.5 Components added in T10
+### 3.5 Components added during the port
 
-Five components arrived after the port, each in `es.redactado.menu.view`, each
-routed through the same action table as a class-based menu. Limits are enforced at
-construction except where a limit cannot be known until render, which is said so
-on the method.
+These arrived after the source tree was read, each in `es.redactado.menu.view`,
+each routed through the same action table as a class-based menu. Limits are
+enforced at construction except where a limit cannot be known until render, which
+is said so on the method.
 
 ### `Nav`
 
