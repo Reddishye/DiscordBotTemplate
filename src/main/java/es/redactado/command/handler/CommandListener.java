@@ -15,7 +15,9 @@ import org.slf4j.LoggerFactory;
 public class CommandListener extends ListenerAdapter {
     private static final Logger LOGGER = LoggerFactory.getLogger(CommandListener.class);
     private static final String ERROR_MESSAGE =
-            "⚠️ An internal error occurred processing this command.";
+            Character.toString(0x26A0)
+                    + "\uFE0F"
+                    + " An internal error occurred processing this command.";
 
     private final CommandRegister commandRegister;
     private final Executor commandExecutor;

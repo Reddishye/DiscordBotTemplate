@@ -33,10 +33,18 @@ public class PingCommand implements BaseSlashCommand {
         event.getHook()
                 .sendMessage(
                         String.format(
-                                "`🏓` Pong!\n"
-                                        + "`⏱️` Response time: %d ms\n"
-                                        + "`🌐` Gateway ping: %d ms",
-                                responseTime, gatewayPing))
+                                "`"
+                                        + Character.toString(0x1F3D3)
+                                        + "` Pong!\n"
+                                        + "`"
+                                        + Character.toString(0x23F1)
+                                        + "\uFE0F"
+                                        + "` Response time: %d ms\n"
+                                        + "`"
+                                        + Character.toString(0x1F310)
+                                        + "` Gateway ping: %d ms",
+                                responseTime,
+                                gatewayPing))
                 .queue();
     }
 }

@@ -27,7 +27,7 @@ public class ServiceManager {
     }
 
     public void startAll(List<Class<? extends IService>> serviceClasses) {
-        // Snapshot before this batch — only init new services
+        // Snapshot before this batch, so only new services are initialised
         List<IService> previouslyResolved = new ArrayList<>(resolved);
 
         Map<Class<? extends IService>, IService> instances =
