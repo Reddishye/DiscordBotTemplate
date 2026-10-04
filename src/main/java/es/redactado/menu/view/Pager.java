@@ -71,6 +71,20 @@ public final class Pager<T> implements MenuComponent {
     }
 
     /**
+     * Reports whether a string is a valid pager id.
+     *
+     * <p>Exposed so that a caller declaring many pagers can check them where it declares
+     * them, rather than discovering one bad id at the first render that reaches it. The
+     * pattern lives here so there is one rule and not two that can disagree.
+     *
+     * @param id the candidate id
+     * @return whether {@link #of} would accept it
+     */
+    public static boolean isValidId(String id) {
+        return id != null && ID.matcher(id).matches();
+    }
+
+    /**
      * Builds a pager.
      *
      * @param id identifies this pager within the view; two pagers in one view must differ
