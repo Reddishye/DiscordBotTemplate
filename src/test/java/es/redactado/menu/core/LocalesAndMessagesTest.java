@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Covers locale selection and the substitution rules.
  *
- * <p>Note the package: JDA 6.4.2 declares {@code DiscordLocale} in
+ * <p>Note the package: JDA 6.5.0 declares {@code DiscordLocale} in
  * {@code net.dv8tion.jda.api.interactions}, not in a {@code locales} subpackage, and
  * only {@link Interaction#getUserLocale()} exposes a user's locale. There is no
  * {@code User.getLocale()}.

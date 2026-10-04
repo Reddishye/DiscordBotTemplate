@@ -26,7 +26,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(27) } }
 val mockitoAgent: Configuration by configurations.creating
 
 dependencies {
-    implementation("net.dv8tion:JDA:6.4.2") { exclude(module = "opus-java") }
+    implementation("net.dv8tion:JDA:6.5.0") { exclude(module = "opus-java") }
     implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
     implementation("com.google.inject:guice:7.0.0") // Dependency Injection
     implementation("com.github.ben-manes.caffeine:caffeine:v3.2.2")
@@ -54,7 +54,7 @@ dependencies {
     implementation("com.zaxxer:HikariCP:7.0.2")
     implementation("org.mariadb.jdbc:mariadb-java-client:3.5.7")
     implementation("org.xerial:sqlite-jdbc:3.50.3.0")
-    implementation("com.h2database:h2:2.3.232")
+    implementation("com.h2database:h2:2.4.240")
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")

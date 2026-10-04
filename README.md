@@ -37,7 +37,7 @@ easy.
 | --- | --- |
 | Java | 27 |
 | Gradle | 9.8.0, through the wrapper |
-| JDA | 6.4.2 |
+| JDA | 6.5.0 |
 
 ### Project structure
 

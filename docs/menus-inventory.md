@@ -39,7 +39,7 @@ hierarchies, pattern-matching `switch` and virtual threads, all arrived by 21.
 
 Present in `build.gradle.kts`:
 
-- JDA `6.4.2` (`opus-java` excluded)
+- JDA `6.5.0` (`opus-java` excluded)
 - discord-webhooks `0.8.4`
 - Guice `7.0.0`
 - dotenv-java `3.2.0`
@@ -471,9 +471,12 @@ fail a build for being slow.
 covering interface mocking, interaction verification, virtual threads, and the
 pinned toolchain version.
 
-## 2. JDA 6.4.2 API surface
+## 2. JDA 6.5.0 API surface
 
-Checked in `JDA-6.4.2-sources.jar`.
+Checked in `JDA-6.4.2-sources.jar`, then re-checked on 6.5.0 for every constant this
+framework reads and for the one type whose package is surprising. Nothing moved: the
+select, modal and text-input limits, the label and value lengths, and
+`DiscordLocale`'s package are the same in both.
 
 ### 2.1 Available
 
@@ -570,7 +573,7 @@ selection can follow interaction locale, then guild locale, then English.
 Root: `/home/redactado/Workspace/scpsl-helperbot/src/main/java/es/redactado/menu`
 (29 files, 1737 lines of Java, including `ProfileMenu`).
 
-The source project uses JDA 6.4.2, which is now also the target's version, so
+The source project uses JDA 6.4.2, which the target has now moved past, so
 every Components V2 pattern the source relies on ports over unchanged. The only
 API edits the port needs are the ones made for the menu framework's own rules,
 not for version compatibility.
@@ -610,7 +613,7 @@ is the final path; the "Name" column is the final type name where it differs.
 | `exception/StateNotFoundException.java` | `api/StateNotFoundException.java` | `StateNotFoundException` | replaced by `UserFacingException` in T5 |
 | `navigation/NavigationAction.java` | `core/NavigationAction.java` | `NavigationAction` | **T5** parses mode and target into `ctx.navigate` |
 | `navigation/NavigationMode.java` | `api/NavigationMode.java` | `NavigationMode` | **T5** moved to `api`, reduced to `PUSH`, `REPLACE`, `BACK`, `ROOT` |
-| `validation/Limits.java` | `api/Limits.java` | `Limits` | moved out of `view` in prep; extended with the 6.4.2 limits in T10 |
+| `validation/Limits.java` | `api/Limits.java` | `Limits` | moved out of `view` in prep; extended with the JDA limits |
 | `validation/ValidationResult.java` | `api/ValidationResult.java` | `ValidationResult` | **PREP** moved to `api`; rewritten as a record in T10 |
 | `validation/Validator.java` | `api/Validator.java` | `Validator` | **PREP** moved to `api`; every outgoing view is checked by `ViewEditor` |
 

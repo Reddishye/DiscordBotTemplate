@@ -39,7 +39,7 @@ Each entry states the question and the default that applies until it is answered
 ## Verified baseline
 
 - Java 27 toolchain, Gradle 9.8.0 through the wrapper.
-- JDA 6.4.2, Jackson Databind 2.19.1 at the version JDA already resolves.
+- JDA 6.5.0, Jackson Databind 2.19.1 at the version JDA already resolves.
 - Build command: `./gradlew clean spotlessApply build`.
 - Stress tests: `./gradlew test -PrunStress`, tagged `stress` and excluded from the build above.
 - Filesystem-tagged tests: `./gradlew test -PexcludeTags=filesystem`.

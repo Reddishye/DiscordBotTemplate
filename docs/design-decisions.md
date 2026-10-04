@@ -152,7 +152,7 @@ the dash. What the code *is* is in `docs/menus-inventory.md`; what is still open
 
 ## JDA facts that differed from expectations
 
-- Upgraded from `6.0.0-rc.3` to `6.4.2`: components v2 is the only way to render a container,
+- Upgraded from `6.0.0-rc.3` to `6.5.0`: components v2 is the only way to render a container,
   and the release candidate's API differs from the release's.
 - `Components` has no v2 convenience factories, so the framework builds containers itself.
 - JDA does not validate emoji on the way in, so the preset package validates them instead.
@@ -162,14 +162,14 @@ the dash. What the code *is* is in `docs/menus-inventory.md`; what is still open
   follow-ups after an edit go through the hook.
 - A `StringSelectInteractionEvent` has no session of its own, which is why every later kind of
   interaction gets its context from the router rather than from the event.
-- JDA 6.4.2 has no user locale on `User`; it is on `Member` and the package is not where it
+- JDA 6.5.0 has no user locale on `User`; it is on `Member` and the package is not where it
   looks, so `Locales` resolves it in one place.
 - `ButtonInteractionEvent.getMessage()` can be null for a message with no interaction metadata,
   which is how a shared channel message differs from a personal one.
 
 ## Environment
 
-- Java 27 toolchain, Gradle 9.8.0 through the wrapper, JDA 6.4.2, Jackson Databind 2.19.1 at the
+- Java 27 toolchain, Gradle 9.8.0 through the wrapper, JDA 6.5.0, Jackson Databind 2.19.1 at the
   version JDA already resolves.
 - Build command: `./gradlew clean spotlessApply build`. Spotless is part of it because the
   format is checked rather than discussed.
