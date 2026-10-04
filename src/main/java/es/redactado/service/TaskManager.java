@@ -208,6 +208,37 @@ public class TaskManager implements IService {
     }
 
     /**
+     * The executor that runs blocking I/O, one virtual thread per task.
+     *
+     * <p>Returned as a bare {@link Executor} rather than an {@link ExecutorService} so a caller
+     * cannot shut down a pool it does not own. Whoever creates an executor closes it; a component
+     * that borrows this one keeps running after the component is closed, and a component that
+     * closed the pool would break every other borrower at once.
+     *
+     * <p>The pool is bounded by whatever the task waits on rather than by thread count, so this is
+     * the executor to hand to work that blocks on a network or database call.
+     *
+     * @return the I/O executor, which stays owned by this manager
+     * @throws IllegalStateException if the manager is not running
+     */
+    public Executor ioExecutor() {
+        return pools().io();
+    }
+
+    /**
+     * The executor that runs CPU-bound work, a fixed pool sized to the available processors.
+     *
+     * <p>Returned as a bare {@link Executor} for the same reason as {@link #ioExecutor()}: the
+     * caller does not own it and must not be able to close it.
+     *
+     * @return the CPU-bound executor, which stays owned by this manager
+     * @throws IllegalStateException if the manager is not running
+     */
+    public Executor cpuExecutor() {
+        return pools().cpu();
+    }
+
+    /**
      * Runs a task once after a delay. The timer thread only triggers the task; the work itself
      * runs on the CPU pool.
      *
