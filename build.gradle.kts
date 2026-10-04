@@ -71,7 +71,14 @@ tasks.test {
     // Filesystem tests drive a real WatchService and can be slow on some file systems.
     // Skip them with: ./gradlew test -PexcludeTags=filesystem
     val excludedTags: String? = providers.gradleProperty("excludeTags").orNull
+    // Concurrency stress tests use the real pools and measure wall-clock percentiles, so they
+    // are excluded by default: a slow machine should not fail a build for being slow. Run them
+    // with: ./gradlew test -PrunStress
+    val runStress = providers.gradleProperty("runStress").isPresent
     useJUnitPlatform {
+        if (!runStress) {
+            excludeTags("stress")
+        }
         if (excludedTags != null) {
             excludedTags.split(",").map(String::trim).filter(String::isNotEmpty).forEach { tag ->
                 excludeTags(tag)

@@ -1911,3 +1911,59 @@ better than one nobody can.
 - Waiting for a service counter is not waiting for a service call: the counter increments at
   the start of the blocking call. The tests wait for the effect, or for the redraw the
   handler's chain ends in.
+
+## T13: concurrency stress tests
+
+`MenuConcurrencyStressTest` is the only test in the project that uses the real pools: a real
+`TaskManager`, a real `MenuExecutor.shared(tasks.ioExecutor())`, and a router over both. Every
+other test hands the router an executor it can step, which is the only way to assert ordering
+and also the only way to miss everything that depends on real concurrency.
+
+Tagged `stress` and excluded from the default build, with `./gradlew test -PrunStress` to run
+them. A test that measures wall-clock percentiles should not fail a build for being slow.
+
+### Three test-design mistakes, each found by a failure
+
+**A shared latch does not make clicks sequential.** The first version waited on one
+`CountDownLatch(50)` per message, which is only released after all fifty have run, so all
+fifty clicks raced each other and the guard dropped half of them. Sequencing means waiting for
+the *previous* click, so the worker waits on that message's own completion count.
+
+**Building a mock inside the barrier tests the scheduler.** Scenario B released 400 pressers
+at a `CyclicBarrier` and built each JDA mock *after* it. Creating six mocks is slow enough that
+one half of a pair routinely arrived after the other's 20 ms handler had finished, so the
+guard was never asked the question. Events are now built before the barrier, and each
+message's two presses are dispatched back to back from one thread, which is the hardest case
+for a claim taken synchronously inside dispatch.
+
+**Growing a fixture list from 200 threads is a race.** `while (counters.size() <= index)
+counters.add(...)` from every worker leaves duplicate slots, so one run reported
+`handled == 10000` and `perMessage` full of zeros. Counters are now created once, on one
+thread, before any work starts.
+
+A fourth was a bound rather than a structure: the per-click wait was 200 ms while the
+scenario's own p99 is up to 275 ms, so a slow click looked dropped, was pressed again, and the
+count came out as 10,002 handler runs for 10,000 clicks. The bound is now two seconds, and
+`handled == clicks` is the assertion that would catch it going wrong again.
+
+### What the guard's drops are
+
+Between 1 and 11 of the 10,000 presses per run were dropped and had to be pressed again
+(102 across 20 runs, 0.05%). Each is the duplicate-click guard working: the worker saw its
+previous handler finish a few instructions before the router released the message claim, and
+pressed again into a message that was still claimed. The test logs the count rather than
+asserting zero, because a drop is the guard doing its job and a user pressing again is exactly
+what happens next.
+
+### Measured over 20 consecutive runs
+
+| Scenario | Interactions | Elapsed (median) | Rate (median) | p50 | p99 |
+| --- | --- | --- | --- | --- | --- |
+| A: 200 messages x 50 sequential clicks | 10000 | 3237 ms [2259-3834] | 3182/s | 22 ms | 179 ms (max 275) |
+| B: 200 messages pressed twice | 400 | 57 ms [27-130] | 6984/s | 0 ms | 10 ms (max 27) |
+| C: 10000 loads over 50 keys | 10000 | 71 ms [44-101] | 142753/s | 31 ms | 58 ms (max 81) |
+| D: 400 presses, router closed under load | 400 | 183 ms [146-228] | 2195/s | 0 ms | 0 ms |
+
+20 of 20 runs passed. Scenario C's loader call count is the assertion that matters there: at
+most 50 calls to a service for 10,000 concurrent reads, which is the stampede the cache exists
+to prevent.
