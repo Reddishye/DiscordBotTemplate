@@ -3,9 +3,11 @@
 How to check the menu system by hand, once a test bot runs the showcase menu.
 
 The showcase (`es.redactado.menu.examples.ShowcaseMenu`) is compiled and tested but
-**never registered by default**. It runs only after somebody deliberately wires it
-up, so if the menu does not appear, check that wiring before anything else: see
-`docs/menus-inventory.md` section 1.5.
+**never registered by default**. The framework now ships wired: `MenuService` starts
+with the bot and `MenuListener` routes interactions to it. What it does **not** ship
+is a way to open a menu, because that is the developer's decision. The section
+"Opening the showcase" at the end gives you a throwaway command; until you add it,
+there is nothing to open and therefore nothing to test.
 
 Run through the numbered items in order. Each one says what to press and what you
 should see. Anything that does not match is a defect worth reporting with the
@@ -186,6 +188,81 @@ other.
 
 **Expected.** The bot does not break, later clicks still work, and the same
 failure does not print twice for one click.
+
+## Opening the showcase
+
+The framework **ships no commands**. Opening a menu is the developer's decision: a slash
+command, another system's button, a modal. What ships is the primitive,
+`MenuService.open`, and the router that `MenuListener` already feeds.
+
+Nothing below is shipped code. It is a throwaway command of your own, written to the
+template's real command conventions so it compiles as-is.
+
+### 1. A command class
+
+Create `src/main/java/es/redactado/command/ShowcaseCommand.java`, implementing
+`BaseSlashCommand` exactly as `PingCommand` does, with `MenuService` injected:
+
+```java
+package es.redactado.command;
+
+import com.google.inject.Inject;
+import es.redactado.command.type.BaseSlashCommand;
+import es.redactado.menu.examples.ShowcaseMenu;
+import es.redactado.service.MenuService;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.InteractionContextType;
+import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+
+public class ShowcaseCommand implements BaseSlashCommand {
+
+    private final MenuService menuService;
+
+    @Inject
+    public ShowcaseCommand(MenuService menuService) {
+        this.menuService = menuService;
+    }
+
+    @Override
+    public SlashCommandData getCommandData() {
+        return Commands.slash("showcase", "Open the menu showcase")
+                .setNSFW(false)
+                .setContexts(InteractionContextType.GUILD, InteractionContextType.PRIVATE);
+    }
+
+    @Override
+    public void handle(SlashCommandInteractionEvent event) {
+        // Registered once, not per click: registering the same id twice is an error.
+        menuService.register(new ShowcaseMenu(menuService.presets()));
+        menuService.open(event, "showcase", true);
+    }
+}
+```
+
+Then add it to `SLASH_COMMANDS` in `src/main/java/es/redactado/config/Commands.java`:
+
+```java
+public static final List<Class<? extends BaseSlashCommand>> SLASH_COMMANDS =
+        List.of(PingCommand.class, ShowcaseCommand.class);
+```
+
+### 2. What this does, and what it does not
+
+- **Registration happens on the first click.** `register` is idempotent per id but throws
+  on a duplicate, so guard it if you expect repeated use; the snippet above is fine for a
+  test bot and wrong for a busy one.
+- **The second argument is ephemeral.** `true` means only the person who ran the command
+  sees the menu. Pass `false` for a shared board.
+- **The showcase reads `menuService.presets()`** so the preset picker lists your custom
+  presets as well as the five built-in ones.
+- **Delete both files when you are done.** The showcase is an example, not a feature.
+
+### 3. Which manual-test steps this makes possible
+
+**Steps 1 to 11 above**, all of them. Before this snippet nothing in the checklist was
+reachable, because there was no way to open a menu; with it, the only thing standing
+between you and a test run is a restart.
 
 ---
 
