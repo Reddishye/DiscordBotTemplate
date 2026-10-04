@@ -201,6 +201,34 @@ public final class SimpleMenuBuilder<M> {
     }
 
     /**
+     * Declares what a button the DSL did not draw will do.
+     *
+     * <p>For the action that a {@code custom(...)} component renders, such as the confirming
+     * button of a {@link es.redactado.menu.view.Confirm}. Every action the DSL builds itself
+     * is declared by the element that draws it, which leaves no way to handle an action that
+     * arrives from a component the author supplied, and an action with no handler is a button
+     * that fails when pressed.
+     *
+     * <p>Menu-wide, like a form submission: a component's button does not belong to one view,
+     * and a {@code refresh()} from its handler redraws the view the interaction is on, which
+     * is the one the user is looking at.
+     *
+     * @param action the action name; the id the button carries
+     * @param handler what the press runs
+     * @return this builder
+     * @throws IllegalStateException if the action name is already used
+     * @throws IllegalArgumentException if the name cannot be used in an id
+     */
+    public SimpleMenuBuilder<M> onClick(String action, ClickHandler handler) {
+        if (handler == null) {
+            throw new IllegalArgumentException(
+                    "Action '" + action + "' in menu '" + id + "' needs a handler");
+        }
+        declarations.button(null, action, List.of(), false, handler);
+        return this;
+    }
+
+    /**
      * Builds the menu.
      *
      * <p>Every problem the framework can see is reported here, naming the view and the

@@ -1753,3 +1753,100 @@ in flight. A Back is an interaction on that message. So the window in which a us
 could press Back while a view is still rendering does not exist; the ordering is
 therefore invisible to a user, and the only thing it buys is a stack that never
 remembers a view which failed to draw.
+
+## T11: the simple-menu DSL
+
+### `text(Msg)` is `message(Msg)`, because both cannot be `text`
+
+The brief lists `text(String)`, `text(Msg)` and `text(Function<Scope<M>, String>)`
+on the same builder, and its own entry-point example is
+`.text(s -> "Total: " + s.data().total())`.
+
+`Msg` is a functional interface, as the brief requires. A one-argument lambda is
+therefore compatible with both `text(Msg)` and `text(Function<Scope<M>, String>)`,
+and javac reports `reference to text is ambiguous` for every one of them. This is
+the same trap the brief avoided deliberately for the three handler interfaces by
+declaring no overloads there.
+
+Resolved by keeping `text` for the scope form, which is the one the lambdas are for,
+and naming the message form `message(Msg)`. Every `text("literal")` and
+`text(s -> ...)` in the examples reads as written; only the localized form is spelled
+differently.
+
+### `onClick` is not in the brief, and the counter needs it
+
+An action is declared by the element that draws it: a button, a select, a form. That
+leaves no way to declare an action whose button comes from a `custom(...)` component.
+`CounterMenu` puts a `Confirm` in through that escape hatch, and the confirming
+button it renders carries an action name that nothing handled, so pressing it failed
+through the router.
+
+`SimpleMenuBuilder.onClick(String, ClickHandler)` declares exactly that: an action
+with no owning view, like `onSubmit`. It is menu-wide rather than per view for the
+same reason a submission is, and a `refresh()` from its handler redraws the view the
+user is looking at.
+
+### `link` returns the row, and `and()` is only needed after a button
+
+The brief leaves the return type of `link` open and asks for the simplest chaining
+that compiles cleanly. A `void link` would make a row impossible to write as one
+expression, because nothing could follow it. It returns the row, like `back()` and
+`view()`.
+
+`ButtonSpec.and()` exists because the button methods return a `ButtonSpec`, so that
+icon, params, disabled and modal can be set on the button that was just declared. It
+is only valid immediately after a button method; after `link`, `back`, `view` or
+`item` the receiver is already the row. The alternative, a row builder that can call
+every button method from every other, is a wider surface for the same result.
+
+### Validation fires where the element is declared, not all of it at `build()`
+
+The brief says the rules are checked in `build()`. Most of them cannot wait that
+long to be useful: an author who writes six buttons in a row is looking at that line,
+and an exception thrown from `build()` at the end of a 40-line declaration names the
+view but not the line.
+
+So the per-element rules fire at the declaration call, and `build()` runs the two
+that genuinely need the whole menu in front of them: a menu with no home view, and a
+view declaring more elements than a container holds. The exception types and the
+messages are what the brief asked for; only the moment differs. Every rule still
+fails at authoring time, never at the first render in front of a user.
+
+### One rule the framework already had, exposed rather than duplicated
+
+The list id rules belong to `Pager`, which validates them with its own pattern. Rather
+than restate the pattern in the DSL, `Pager.isValidId(String)` is public and the DSL
+asks it, so there is one rule and not two that can disagree.
+
+### A `custom` lambda needs a typed local
+
+`custom(MenuComponent)` and `custom(Function<Scope<M>, MenuComponent>)` are both
+overloads of a functional interface against a functional interface, so
+`v.custom(scope -> ...)` is ambiguous. The instance form, `v.custom(component)`, is
+always unambiguous and is what the counter example uses. A scoped custom needs a local
+declared as `Function<Scope<M>, MenuComponent>`. Documented rather than worked around:
+renaming the constant form would have been the only way to remove the ambiguity, and
+`custom(component)` is the spelling that reads best for the common case.
+
+### The examples found a real trap in the session API
+
+Both `CounterMenu` and `ServerInfoMenu` failed their end-to-end tests at first with
+the framework's own generic error. The cause is worth writing down: `findSession()`
+returns empty until something has created the session, and the **first** press on a
+fresh message is exactly that case. Reading with `findSession` and a default is right;
+writing with `session()` is the only thing that works. Both examples now say so where
+a reader would copy them.
+
+### The test fixtures had to become public
+
+`JdaMocks` and `TestRouters` were package-private in `es.redactado.menu.core`. The
+simple-menu end-to-end tests are in another package and drive the same router, and a
+second copy of those mocks would drift from the first. Both are now public test
+classes with a note saying why. No framework type changed visibility.
+
+### What the loader failure test actually proves
+
+A failed loader fails the render with the loader's own exception; it is the router
+that turns it into one localized sentence with a reference code, through
+`ErrorReply`. The render test therefore asserts the root cause, and the localized
+reply is proved in `MenuRouterOpenTest` and friends rather than being asserted twice.

@@ -767,6 +767,140 @@ form.shortField("name", "Name").required(true);
 showModal(ctx, form.build());
 ```
 
+## 3.6 Simple menus
+
+`es.redactado.menu.simple` declares a menu without writing a class. What
+`SimpleMenuBuilder.build()` returns is an ordinary `es.redactado.menu.api.Menu`,
+extending the same `AbstractMenu` a hand-written one extends, so routing, the
+owner check, the duplicate-click guard, sessions, presets, translations and the
+loader timeout are the framework's and not the DSL's. There is no second dispatch
+path and no way for a simple menu to be treated differently.
+
+```java
+Menu help = Menus.simple("help")
+    .tone(Tone.INFO)
+    .home(v -> v
+        .header(Msg.key("help.title"), Msg.key("help.subtitle"))
+        .text("Pick a topic.")
+        .row(r -> r.primary("faq", "FAQ", click -> click.go("faq"))
+                   .link("Docs", "https://example.com")))
+    .view("faq", v -> v.text("...").row(r -> r.back()))
+    .build();
+```
+
+The builders are mutable, one pass, and discarded; everything built is immutable
+and safe to share, which is what `SimpleMenuThreadSafetyTest.concurrentRendersAreIndependent`
+proves by rendering one menu from eight threads at once.
+
+### `Msg`
+
+The only user-facing text type in the DSL, and a functional interface with no
+behaviour beyond resolving: `Msg.literal(String)` for content, and
+`Msg.key(String, Object... args)` for anything a user reads in more than one
+language, resolved through `ctx.t`. An unknown key renders as the key, loudly.
+
+### Reference
+
+`SimpleMenuBuilder<M>`, all of it fluent, all returning the builder:
+
+| Method | Purpose | Limits and rules |
+| --- | --- | --- |
+| `tone(Tone)` | what the menu is for, and so which colour it takes from the preset | never null; default `Tone.ACCENT` |
+| `preset(String)` | forces a look, whatever the guild and user asked for | not blank |
+| `shared()` | usable by everyone who can see it, not only its owner | off by default |
+| `loadTimeout(Duration)` | how long a render waits for the loader | null means the 10-second default |
+| `home(Consumer<ViewBuilder<M>>)` | the view a menu opens on | **required**, and only once |
+| `view(String, Consumer<ViewBuilder<M>>)` | a view reachable by navigation | the name is also the action that opens it |
+| `onClick(String, ClickHandler)` | handles an action whose button a `custom(...)` component drew | name is menu-wide |
+| `onSubmit(String, SubmitHandler)` | handles a submitted modal form | name is menu-wide |
+| `build()` | returns the menu | runs the whole-menu checks |
+
+`ViewBuilder<M>`, likewise fluent:
+
+| Method | Purpose | Limits and rules |
+| --- | --- | --- |
+| `header(Msg)` / `header(Msg, Msg)` / `header(String)` | the title, with an optional line under it | a preset without subtitles drops the subtitle |
+| `text(String)` / `message(Msg)` | a line of fixed text | the `String` form is a **literal**; `header(String)` is a **key** |
+| `text(Function<Scope<M>, String>)` | a line built from the loaded model | called once per render |
+| `field(Msg, Function<Scope<M>, String>)` | a labelled value, laid out beside other fields | label resolved per reader, value per render |
+| `divider()` / `space()` | a rule, or the blank line a preset asks for instead | a preset may draw neither |
+| `section(Msg, String)` | text with an image beside it | remote image URL |
+| `row(Consumer<RowBuilder<M>>)` | up to five buttons, links or navigation | **at most 5 items**; refused at declaration |
+| `select(String, Msg, Consumer<SelectSpec>, PickHandler)` | a select menu, in a row of its own | at most 25 options; a selected value no option declares is refused |
+| `list(String, Function<Scope<M>, List<T>>, int, Function<T, String>)` | a paged list of text items | id `[a-z0-9_]{1,20}`, **unique per menu**; page 1 to 20 |
+| `custom(MenuComponent)` / `custom(Function<Scope<M>, MenuComponent>)` | anything the DSL has no word for | built per render; a lambda needs a typed local because `MenuComponent` is itself a functional interface |
+
+`RowBuilder<M>`, whose button methods return a `ButtonSpec` and whose `and()`
+comes back to the row:
+
+| Method | Purpose | Limits and rules |
+| --- | --- | --- |
+| `primary` / `secondary` / `success` / `danger` | a button that runs a handler | `Msg` or literal label; a handler is required |
+| `link(Msg, String)` / `link(String, String)` | a Discord link button | a URL is required; it leaves the menu system entirely |
+| `back()` | the previous view | **legal on `home`**, where it renders home again |
+| `view(String, String)` | opens a view of this menu, keeping this one in history | the view must be declared |
+| `item(RowItem)` | a row item the DSL has no word for | the same 5-item limit |
+| `ButtonSpec.icon(IconKey)` / `params(String...)` / `disabled(boolean)` / `opensModal()` | the details only some buttons have | `params` are counted against the 100-character id limit at declaration |
+| `ButtonSpec.and()` | back to the row | only needed after a button method |
+
+`SelectSpec`: `option(String value, String label)`, `option(value, label, description)`,
+`selected(String...)`, `range(int min, int max)`. The value is what a handler
+receives; the label is what a user reads.
+
+### Handlers and triggers
+
+Every handler returns a `CompletableFuture<Void>` and takes exactly one argument,
+which is a trigger:
+
+| Type | Handler | Carries |
+| --- | --- | --- |
+| `Click` | `ClickHandler.handle(Click)` | `event()`, and `modal(Modal)` for a button declared `opensModal()` |
+| `Pick` | `PickHandler.handle(Pick)` | `values()`, the chosen values |
+| `Submit` | `SubmitHandler.handle(Submit)` | `values()`, the answers keyed by field id and trimmed |
+
+A `Trigger` has `ctx()`, `refresh()`, `go(String viewName)`,
+`go(String menuId, String viewName)`, `back()`, `reply(Msg)`,
+`reply(String key, Object... args)` and `done()`. `refresh()` re-renders the view
+that owns the action that was pressed, so one handler is correct on any view.
+
+### What is refused, and when
+
+Most rules fire **where the element is declared**, because that is where the
+author is looking at the line: a duplicate action name, a reserved name
+(`nav`, `page`, `home`), an action name with a colon, an id that cannot fit in 100
+characters once its params are counted, an invalid or duplicate list id, a row
+over five items, an empty row, a select with no or too many options, a selected
+value no option declares, and a view name that is already taken.
+
+`build()` then runs the checks that need every view in front of it: a menu with no
+home view, and a view declaring more elements than a container holds.
+
+The exception is always `IllegalStateException` or `IllegalArgumentException`, and
+the message names the menu, the view and the element.
+
+### Examples
+
+All three are compiled and tested but **never registered by default**, and live in
+the same exempt package as the showcase, because an example is allowed to write
+literal text where the framework is not.
+
+| Example | Shows | Proved by |
+| --- | --- | --- |
+| `HelpMenu` | two static views, a link, Back | `SimpleExamplesRenderTest.everyExampleViewRendersWithinLimits`, `SimpleExamplesEndToEndTest.helpNavigatesAndComesBack`, `SimpleExamplesEndToEndTest.helpLinkIsNotAnAction` |
+| `CounterMenu` | session state, `refresh()`, a reset behind a `Confirm` dropped in with `custom(...)` | `SimpleExamplesEndToEndTest.counterCountsInTheSession`, `SimpleExamplesEndToEndTest.counterResetIsConfirmed`, `SimpleExamplesEndToEndTest.counterResetRuns` |
+| `ServerInfoMenu` | a slow loader, a paged list, a select that switches the section shown | `SimpleExamplesEndToEndTest.serverInfoLoadsAndPages`, `SimpleExamplesEndToEndTest.serverInfoSelectSwitchesSection`, `SimpleExamplesEndToEndTest.serverInfoLoaderIsAsynchronous` |
+
+### Two names that differ from the obvious spelling
+
+- **`message(Msg)` rather than `text(Msg)`.** `Msg` is a functional interface, so
+  `text(Msg)` beside `text(Function<Scope<M>, String>)` makes every
+  `text(s -> ...)` ambiguous and the example above would not compile. `text` keeps
+  the scope form, which is what the lambdas need.
+- **`onClick` exists at all.** An action is declared by the element that draws it,
+  which leaves nothing to declare an action whose button comes from a
+  `custom(...)` component. `CounterMenu` needs it for the confirming button of a
+  `Confirm`.
+
 ## 4. Open questions
 
 Recorded in `NOTES.md` rather than resolved unilaterally.

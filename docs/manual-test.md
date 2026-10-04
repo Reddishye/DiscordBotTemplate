@@ -3,7 +3,8 @@
 How to check the menu system by hand, once a test bot runs the showcase menu.
 
 The showcase (`es.redactado.menu.examples.ShowcaseMenu`) is compiled and tested but
-**never registered by default**. The framework now ships wired: `MenuService` starts
+**never registered by default**. Neither are the three simple-menu examples, listed in
+the last section. The framework now ships wired: `MenuService` starts
 with the bot and `MenuListener` routes interactions to it. What it does **not** ship
 is a way to open a menu, because that is the developer's decision. The section
 "Opening the showcase" at the end gives you a throwaway command; until you add it,
@@ -258,11 +259,41 @@ public static final List<Class<? extends BaseSlashCommand>> SLASH_COMMANDS =
   presets as well as the five built-in ones.
 - **Delete both files when you are done.** The showcase is an example, not a feature.
 
-### 3. Which manual-test steps this makes possible
+### 3. The simple-menu examples
+
+The three examples in `es.redactado.menu.examples` are **not registered either**. To
+walk them by hand, register whichever you want in the same command and open it by
+id. Each is built by a static method, so this is a one-line change to the command
+above:
+
+```java
+import es.redactado.menu.examples.CounterMenu;
+import es.redactado.menu.examples.HelpMenu;
+import es.redactado.menu.examples.ServerInfoMenu;
+
+// HelpMenu.build()                -> "help",          two views, a link, Back
+menuService.register(CounterMenu.build());
+menuService.register(ServerInfoMenu.build(new ServerInfoMenu.FakeService(400)));
+menuService.open(event, "counter", true);
+menuService.open(event, "server_info", true);
+```
+
+| Example | Open by id | What to press |
+| --- | --- | --- |
+| `HelpMenu.build()` | `help` | **FAQ**, then **Back**. The **Docs** button should open your browser and touch no message. |
+| `CounterMenu.build()` | `counter` | **+1** three times, then **-1** once. **Reset** must only ask. Press **Back** to cancel and the count must not change, then press Reset again and accept. |
+| `ServerInfoMenu.build(new FakeService(400))` | `server_info` | Page the member list with the arrows. Pick **Members** and then **Roles** in the select: the text under the list changes and **nothing is added to the history**, so there is no Back. |
+
+The `FakeService` delay is deliberate: it proves the load runs off the JDA event
+thread. Lower it to `0` if you want the menu to feel instant, and delete the three
+examples when you are done, like the showcase.
+
+### 4. Which manual-test steps this makes possible
 
 **Steps 1 to 11 above**, all of them. Before this snippet nothing in the checklist was
 reachable, because there was no way to open a menu; with it, the only thing standing
-between you and a test run is a restart.
+between you and a test run is a restart. Section 3 adds the three simple-menu examples
+to the same run.
 
 ---
 
