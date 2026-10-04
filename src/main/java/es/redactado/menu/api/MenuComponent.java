@@ -16,8 +16,8 @@ public interface MenuComponent {
      * Produces the JDA child components this element contributes.
      *
      * <p>Most components return a list of one. Compound components such as
-     * {@code es.redactado.menu.view.Row} and
-     * {@code es.redactado.menu.view.SectionList} return several.
+     * {@code es.redactado.menu.view.Row}, {@code es.redactado.menu.view.Pager} and
+     * {@code es.redactado.menu.view.Confirm} return several.
      *
      * @param ctx the context of the current interaction
      * @return the JDA child components, never empty
