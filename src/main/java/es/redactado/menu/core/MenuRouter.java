@@ -5,9 +5,12 @@ import es.redactado.menu.api.ActionTable;
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.api.MenuNotFoundException;
+import es.redactado.menu.api.NavEntry;
 import es.redactado.menu.preset.InMemoryPresetPreferences;
 import es.redactado.menu.preset.Preset;
 import es.redactado.menu.preset.PresetRegistry;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -232,6 +235,105 @@ public final class MenuRouter implements AutoCloseable {
      */
     public CompletableFuture<Container> render(String menuId, MenuContext ctx) {
         return get(menuId).render(ctx);
+    }
+
+    /**
+     * Opens a menu in reply to an interaction.
+     *
+     * <p>Works with any {@link IReplyCallback}: a slash command, a context menu, or a
+     * component or modal belonging to some other system. How the interaction got here is
+     * the caller's business; this method only needs somewhere to reply and a menu id.
+     *
+     * <p>Moving between this system's own menus afterwards is not done through this method:
+     * once a menu is on screen its buttons carry component ids, and those go through
+     * {@link MenuContext#navigate}.
+     *
+     * <p>The order is the whole point. An unknown menu id fails before anything is
+     * acknowledged, so the caller can still answer with a plain reply. Otherwise the
+     * interaction is deferred first and every step after that may block, because Discord
+     * only allows three seconds for the acknowledgement.
+     *
+     * <p>The message this produces carries interaction metadata, so the owner check works
+     * for the clicks that follow: only the user who opened the menu can press its buttons.
+     *
+     * @param event the interaction to answer
+     * @param menuId the menu to show, which must be registered
+     * @param ephemeral whether only the opening user sees it
+     * @return a future completing when the menu has been sent, or completing exceptionally
+     *     with the failure after the interaction has been answered through the usual error
+     *     reply
+     * @throws MenuNotFoundException synchronously, before anything is acknowledged, when
+     *     no menu is registered under that id
+     */
+    public CompletableFuture<Void> open(IReplyCallback event, String menuId, boolean ephemeral) {
+        Registered registered = menus.get(menuId);
+        if (registered == null) {
+            throw new MenuNotFoundException(menuId);
+        }
+        Menu menu = registered.menu();
+
+        event.deferReply(ephemeral).queue();
+
+        return executor.supply(() -> renderFor(event, menu))
+                .thenCompose(future -> future)
+                .thenCompose(container -> ViewEditor.edit(event.getHook(), container))
+                .whenComplete(
+                        (ignored, error) -> {
+                            if (error != null) {
+                                ErrorReply.send(
+                                        event,
+                                        messages,
+                                        localeOf(event),
+                                        error,
+                                        menuId,
+                                        NavigationAction.HOME_VIEW);
+                            }
+                        });
+    }
+
+    /**
+     * Resolves the preset and renders the menu's opening view, off the event thread.
+     *
+     * <p>The context is built once, with the resolved preset, and then addressed at
+     * whichever entry the menu declares as its home. Asking the menu rather than assuming
+     * {@code home} is what lets a menu start on a different view, and it gets a real
+     * context to answer with instead of a null.
+     */
+    private CompletableFuture<Container> renderFor(IReplyCallback event, Menu menu) {
+        return presets.resolve(menu, guildId(event), userId(event))
+                .thenApply(
+                        preset -> {
+                            MenuContext ctx =
+                                    BaseContext.fromReply(
+                                            event,
+                                            new NavEntry(
+                                                    menu.id(),
+                                                    NavigationAction.HOME_VIEW,
+                                                    List.of()),
+                                            sessions,
+                                            navigator,
+                                            messages,
+                                            preset);
+                            return ctx.at(menu.home(ctx));
+                        })
+                .thenCompose(context -> menu.render(context));
+    }
+
+    /** The guild, or {@code 0} in a direct message, which the resolver reads as "none". */
+    private static long guildId(IReplyCallback event) {
+        return event.getGuild() == null ? 0L : event.getGuild().getIdLong();
+    }
+
+    private static long userId(IReplyCallback event) {
+        return event.getUser().getIdLong();
+    }
+
+    private static Locale localeOf(IReplyCallback event) {
+        return Locales.resolve(
+                event.getUserLocale(),
+                event.getGuild() == null
+                        ? net.dv8tion.jda.api.interactions.DiscordLocale.UNKNOWN
+                        : event.getGuildLocale());
     }
 
     /**

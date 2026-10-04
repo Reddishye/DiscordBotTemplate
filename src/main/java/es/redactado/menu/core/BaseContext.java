@@ -147,6 +147,40 @@ public final class BaseContext implements MenuContext {
         return from(event, parsed, sessions, navigator, messages, preset);
     }
 
+    /**
+     * Builds a context from any interaction that can be answered, not only a component one.
+     *
+     * <p>For an interaction that opens a menu rather than pressing one of its buttons: a
+     * slash command, a context menu, a component or modal belonging to another system. There
+     * is no menu message yet, so {@link #messageId()} is empty and {@link #session()} hands
+     * out a detached session that nothing will read back. That is harmless for the render
+     * that is about to happen, and the moment Discord delivers the message every later
+     * click gets a real session keyed by its id.
+     *
+     * @param event any interaction that can be acknowledged and replied to
+     * @param parsed the entry of the view to render, usually the menu's home
+     * @param sessions the store backing this context's session
+     * @param navigator the navigator used by {@link #navigate}
+     * @param messages where user-facing text is resolved
+     * @param preset the preset resolved for this interaction
+     * @return the context
+     */
+    public static MenuContext fromReply(
+            IReplyCallback event,
+            NavEntry entry,
+            SessionStore sessions,
+            Navigator navigator,
+            Messages messages,
+            Preset preset) {
+        return from(
+                event,
+                new ComponentId(entry.menuId(), entry.action(), entry.params()),
+                sessions,
+                navigator,
+                messages,
+                preset);
+    }
+
     private static MenuContext from(
             IReplyCallback event,
             ComponentId parsed,
