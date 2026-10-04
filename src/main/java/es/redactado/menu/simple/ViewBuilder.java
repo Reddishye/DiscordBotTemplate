@@ -207,6 +207,7 @@ public final class ViewBuilder<M> {
         }
         SelectSpec spec = new SelectSpec();
         options.accept(spec);
+        spec.check("'" + action + "' in view '" + viewName + "'");
         declarations.select(viewName, action, handler);
         ownedActions.add(action);
         elements.add(new Elements.SelectElement<>(action, placeholder, spec));

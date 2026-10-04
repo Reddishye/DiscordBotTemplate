@@ -1,5 +1,6 @@
 package es.redactado.menu.simple;
 
+import es.redactado.menu.api.Limits;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -92,6 +93,41 @@ public final class SelectSpec {
         this.min = min;
         this.max = max;
         return this;
+    }
+
+    /**
+     * The checks that need every option in front of it.
+     *
+     * <p>Done where the select is declared rather than at render, because each of these is a
+     * message the user would otherwise only see as a rejected component.
+     *
+     * @param where a description of the select, for the message
+     * @throws IllegalArgumentException if the select could not render
+     */
+    void check(String where) {
+        if (options.isEmpty()) {
+            throw new IllegalArgumentException("Select " + where + " has no options");
+        }
+        if (options.size() > Limits.MAX_SELECT_OPTIONS) {
+            throw new IllegalArgumentException(
+                    ("Select %s declares %d options, Discord accepts at most %d")
+                            .formatted(where, options.size(), Limits.MAX_SELECT_OPTIONS));
+        }
+        for (String value : selected) {
+            boolean declared = false;
+            for (Option option : options) {
+                if (option.value().equals(value)) {
+                    declared = true;
+                    break;
+                }
+            }
+            if (!declared) {
+                throw new IllegalArgumentException(
+                        ("Select %s starts on value '%s', which no option declares; Discord"
+                                        + " rejects a selected value outside the option list")
+                                .formatted(where, value));
+            }
+        }
     }
 
     /** The options, in declaration order. */

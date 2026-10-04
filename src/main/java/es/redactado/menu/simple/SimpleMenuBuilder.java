@@ -184,6 +184,23 @@ public final class SimpleMenuBuilder<M> {
     }
 
     /**
+     * The checks that need the whole menu in front of it.
+     *
+     * <p>Most rules fire where their element is declared, because that is when the author is
+     * looking at the line. These need every view declared, and they are the ones a render
+     * could not recover from: a view holding more elements than a container may hold has no
+     * valid output at all, and a name that cannot fit an id is refused by Discord rather than
+     * by this framework.
+     */
+    private void validate() {
+        for (View<M> view : views) {
+            view.checkNameLength(id.length());
+            Menus.requireFitsInContainer(view, id);
+        }
+        declarations.validate();
+    }
+
+    /**
      * Builds the menu.
      *
      * <p>Every problem the framework can see is reported here, naming the view and the
@@ -197,6 +214,7 @@ public final class SimpleMenuBuilder<M> {
             throw new IllegalStateException(
                     "Menu '" + id + "' has no home view; a menu needs at least one view");
         }
+        validate();
         Loader<M> effective = loader;
         if (effective == null) {
             @SuppressWarnings("unchecked")

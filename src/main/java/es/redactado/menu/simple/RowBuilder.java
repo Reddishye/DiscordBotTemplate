@@ -166,12 +166,14 @@ public final class RowBuilder<M> {
      *
      * @param label the button's text, from a key
      * @param url the URL
+     * @return this row, so a row reads as one expression
      */
-    public void link(Msg label, String url) {
+    public RowBuilder<M> link(Msg label, String url) {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("A link needs a URL in view '" + viewName + "'");
         }
         items.add(ctx -> LinkButton.of(url, label.get(ctx)));
+        return this;
     }
 
     /**
@@ -179,9 +181,10 @@ public final class RowBuilder<M> {
      *
      * @param label the button's text
      * @param url the URL
+     * @return this row, so a row reads as one expression
      */
-    public void link(String label, String url) {
-        link(Msg.literal(label), url);
+    public RowBuilder<M> link(String label, String url) {
+        return link(Msg.literal(label), url);
     }
 
     /**
@@ -240,6 +243,10 @@ public final class RowBuilder<M> {
      */
     void register(Declarations<M> declarations) {
         int total = items.size();
+        if (total == 0) {
+            throw new IllegalArgumentException(
+                    "A row in view '" + viewName + "' has nothing in it");
+        }
         if (total > Limits.MAX_ACTION_ROW_CHILDREN) {
             throw new IllegalArgumentException(
                     ("Row in view '%s' has %d buttons, a row holds at most %d")

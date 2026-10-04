@@ -127,6 +127,32 @@ public final class Menus {
     }
 
     /**
+     * Checks that a view can fit in a container.
+     *
+     * <p>One element, one component, with the exceptions the framework already documents: a
+     * pager is one element however many items it draws, and a header with a subtitle is one
+     * element drawing two lines. Counting elements is therefore a lower bound on the real
+     * output, which is exactly what a limit check needs: a view that fails here certainly
+     * fails at render, and a view that passes here is still validated once rendered.
+     *
+     * @param view the finished view
+     * @param menuId the menu it belongs to, for the message
+     */
+    static <M> void requireFitsInContainer(View<M> view, String menuId) {
+        int elements = view.elements().length;
+        if (elements > es.redactado.menu.api.Limits.MAX_CONTAINER_CHILDREN) {
+            throw new IllegalStateException(
+                    ("View '%s' in menu '%s' declares %d elements, a container holds at most %d;"
+                                    + " a render cannot produce a legal message from it")
+                            .formatted(
+                                    view.name(),
+                                    menuId,
+                                    elements,
+                                    es.redactado.menu.api.Limits.MAX_CONTAINER_CHILDREN));
+        }
+    }
+
+    /**
      * Checks that a view has something in it.
      *
      * @param view the finished view

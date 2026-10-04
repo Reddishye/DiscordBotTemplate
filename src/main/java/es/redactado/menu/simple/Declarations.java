@@ -178,6 +178,19 @@ final class Declarations<M> {
         }
     }
 
+    /**
+     * The checks that need every action in front of them.
+     *
+     * <p>The names were checked as they were declared, because that is where the author is;
+     * this re-reads them against the menu id as a whole so that one rule runs in one place
+     * for every action kind.
+     */
+    void validate() {
+        for (Action<M> action : actions) {
+            requireAction(action.name(), action.view(), List.of());
+        }
+    }
+
     /** The actions, in declaration order. */
     List<Action<M>> actions() {
         return List.copyOf(actions);
