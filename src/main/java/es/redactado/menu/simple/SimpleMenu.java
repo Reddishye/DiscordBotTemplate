@@ -144,7 +144,8 @@ final class SimpleMenu<M> extends AbstractMenu {
 
             @Override
             public CompletableFuture<Void> refresh() {
-                return SimpleMenu.this.refresh(ctx.at(currentView(ctx)));
+                // refresh() resolves the current view itself, so the DSL does not repeat it.
+                return SimpleMenu.this.refresh(ctx);
             }
 
             @Override

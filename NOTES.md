@@ -1879,14 +1879,22 @@ NPE the moment a mocked context rendered a pager. Fixtures that stub `session()`
 This is worth knowing for any interface with default methods: a mock does not run them, so a
 test that expects the default behaviour has to ask for it.
 
-### `refresh(ctx)` after a submission is a bug waiting for a user
+### `refresh(ctx)` now renders the current view, so no caller has to
 
 The profile example's two form handlers first called `refresh(ctx)` and every submission
 replied "That view is not available." A submission's action is `save_birth`, not a view, and
-`AbstractMenu#refresh` renders the context it is given. The simple DSL hides this because
-`Trigger.refresh()` renders the view that owns the action; a hand-written menu has to say
-`refresh(ctx.at(currentView(ctx)))` itself. It is now a named `refreshView` helper with the
-reason in its Javadoc, because `currentView` is not only for Back.
+`AbstractMenu#refresh` rendered the context it was given.
+
+Fixed in the base class rather than in the example: `refresh(ctx)` now renders
+`ctx.at(currentView(ctx))`. That is what every caller meant by it, it is what the simple DSL
+was already doing through `Trigger.refresh()`, and a per-menu helper would have left the next
+hand-written menu free to get it wrong. The `refreshView` helper is gone with it.
+
+One thing this makes explicit, which the DSL hides: a click names the button that was pressed,
+never the screen it was pressed on. A menu with several views therefore has to be able to
+recover the view from the action, either because every action belongs to one view, as in the
+DSL, or because it remembers the view in its session, as `ShowcaseMenu` does. `currentView` is
+that recovery, and `refresh` now depends on it.
 
 ### The blocking-call scan now has an exemption, and it is pinned
 

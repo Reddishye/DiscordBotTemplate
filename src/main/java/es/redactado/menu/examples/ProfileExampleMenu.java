@@ -321,7 +321,7 @@ public final class ProfileExampleMenu extends AbstractMenu implements AutoClosea
         long key = keyOf(ctx);
         return cache.invalidateAfter(
                         executor.supply(() -> service.saveBirthBlocking(key, birth)), key)
-                .thenCompose(ignored -> refreshView(ctx));
+                .thenCompose(ignored -> refresh(ctx));
     }
 
     /** Stores a new link the same way, so the two writes cannot drift apart. */
@@ -333,20 +333,7 @@ public final class ProfileExampleMenu extends AbstractMenu implements AutoClosea
         long key = keyOf(ctx);
         return cache.invalidateAfter(
                         executor.supply(() -> service.addLinkBlocking(key, label, url)), key)
-                .thenCompose(ignored -> refreshView(ctx));
-    }
-
-    /**
-     * Redraws the view the user is looking at, not the action that was pressed.
-     *
-     * <p>{@link AbstractMenu#refresh(MenuContext)} renders the context as it is, and for a
-     * submission the action is {@code save_birth}, which is not a view this menu has. The
-     * simple DSL does this for every handler through {@code Trigger.refresh()}; a hand-written
-     * menu has to say it, and getting it wrong shows up as "That view is not available."
-     * straight after a successful write.
-     */
-    private CompletableFuture<Void> refreshView(MenuContext ctx) {
-        return refresh(ctx.at(currentView(ctx)));
+                .thenCompose(ignored -> refresh(ctx));
     }
 
     /** Removes the profile, which the confirmation view asked about first. */

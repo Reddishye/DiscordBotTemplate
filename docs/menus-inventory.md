@@ -863,6 +863,13 @@ A `Trigger` has `ctx()`, `refresh()`, `go(String viewName)`,
 `reply(String key, Object... args)` and `done()`. `refresh()` re-renders the view
 that owns the action that was pressed, so one handler is correct on any view.
 
+`AbstractMenu.refresh(ctx)` does the same for a hand-written menu: it renders
+`ctx.at(currentView(ctx))`, never `ctx` as it stands. A handler is reached
+through an action, and for most of them that action is not a view, so rendering
+the context as it stands asks the menu for a view named after a button or a
+submission and the user is told the view is not available straight after their
+change was saved. `RefreshCurrentViewTest` is the regression test for that.
+
 ### What is refused, and when
 
 Most rules fire **where the element is declared**, because that is where the

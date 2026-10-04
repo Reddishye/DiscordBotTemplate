@@ -164,7 +164,17 @@ public abstract class AbstractMenu implements Menu {
     }
 
     /**
-     * Re-renders this menu into the original message.
+     * Redraws the view the user is looking at, into the original message.
+     *
+     * <p>The view is {@link #currentView(MenuContext)}, not {@code ctx.action()}, and the
+     * difference is the whole reason this is here rather than a bare {@code render(ctx)}. A
+     * handler is reached through an action, and for most of them that action is not a view: a
+     * submission is {@code save_birth}, a confirmation is {@code do_remove}. Rendering the
+     * context as it stands would ask for a view named after those, and the menu would answer
+     * its own unknown-view error straight after a successful write.
+     *
+     * <p>A single-view menu is unaffected, because for one screen the action and the view are
+     * the same thing.
      *
      * @param ctx the context of the current interaction
      * @return a future completing when the edit is sent
@@ -175,7 +185,8 @@ public abstract class AbstractMenu implements Menu {
         if (!event.isAcknowledged()) {
             throw new IllegalStateException(UNACKNOWLEDGED);
         }
-        return render(ctx).thenCompose(container -> ViewEditor.edit(event.getHook(), container));
+        return render(ctx.at(currentView(ctx)))
+                .thenCompose(container -> ViewEditor.edit(event.getHook(), container));
     }
 
     /**
