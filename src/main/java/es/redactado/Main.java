@@ -1,23 +1,23 @@
 package es.redactado;
 
 import static es.redactado.LogbackOutputStream.redirectSystemOutToLogger;
-import static es.redactado.config.Bot.AUTO_RECONNECT;
-import static es.redactado.config.Bot.GATEWAY_INTENTS;
-import static es.redactado.config.Listeners.LISTENERS;
-import static es.redactado.config.Services.BUSINESS_SERVICES;
-import static es.redactado.config.Services.INFRASTRUCTURE_SERVICES;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import es.redactado.command.handler.CommandRegister;
+import es.redactado.command.publish.CommandPublisher;
+import es.redactado.config.BotConfig;
+import es.redactado.config.ConfigFiles;
+import es.redactado.config.ConfigLoader;
+import es.redactado.feature.FeatureCatalog;
 import es.redactado.service.ServiceManager;
-import io.github.cdimascio.dotenv.Dotenv;
 import io.sentry.Sentry;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.annotation.Nonnull;
+import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.events.ExceptionEvent;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
@@ -37,12 +37,11 @@ public class Main extends ListenerAdapter {
     private ShardManager shardManager;
     private ServiceManager serviceManager;
     private CommandRegister commandRegister;
+    private FeatureCatalog features;
+    private BotConfig config;
 
-    // Guards against onReady firing multiple times across shards
     private final AtomicBoolean businessServicesStarted = new AtomicBoolean(false);
-    // READY event captured async; processed after main-thread init completes
     private volatile ReadyEvent capturedReadyEvent;
-    // Set true once main-thread init done, so late READY events fire immediately
     private volatile boolean initComplete;
 
     public static void main(String[] args) {
@@ -52,31 +51,43 @@ public class Main extends ListenerAdapter {
     public void run() {
         redirectSystemOutToLogger();
 
-        // Phase 1: build the shard manager; onReady only captures the event
-        Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
+        Path configFile =
+                Path.of(
+                        System.getenv("CONFIG_FILE") == null
+                                        || System.getenv("CONFIG_FILE").isBlank()
+                                ? "config.yml"
+                                : System.getenv("CONFIG_FILE"));
+        config = ConfigLoader.load(configFile, System.getenv());
+        if (config.tokenIsPlaceholder()) {
+            throw new IllegalStateException(
+                    "Set bot.token in config.yml, or BOT_TOKEN in the environment, before"
+                            + " starting");
+        }
+        if (config.sentryEnabled() && !config.sentryDsn().isBlank()) {
+            Sentry.init(options -> options.setDsn(config.sentryDsn()));
+        }
 
-        shardManager = buildShardManager(dotenv);
+        shardManager = buildShardManager(config);
         logger.info("ShardManager built, awaiting Ready event...");
 
-        // Phase 2: build the Guice injector, which is where heavy init happens
-        injector = Guice.createInjector(new BotModule(this, shardManager));
+        injector =
+                Guice.createInjector(
+                        new BotModule(this, shardManager, config, ConfigFiles.beside(configFile)));
 
         serviceManager = injector.getInstance(ServiceManager.class);
         commandRegister = injector.getInstance(CommandRegister.class);
+        features = injector.getInstance(FeatureCatalog.class);
 
-        // Phase 3: start the infrastructure services
-        serviceManager.startAll(INFRASTRUCTURE_SERVICES);
+        serviceManager.startAll(features.infrastructure());
         logger.info("Infrastructure services started.");
 
-        // Phase 4: register the listeners
-        List<ListenerAdapter> listeners = instantiateListeners();
-        // Also register commands that are listeners (autocomplete, etc)
+        List<ListenerAdapter> listeners = instantiateListeners(features.listeners());
         commandRegister
                 .getListeners()
                 .forEach(
-                        l -> {
-                            if (!listeners.contains(l)) {
-                                listeners.add(l);
+                        listener -> {
+                            if (!listeners.contains(listener)) {
+                                listeners.add(listener);
                             }
                         });
         for (ListenerAdapter listener : listeners) {
@@ -84,11 +95,10 @@ public class Main extends ListenerAdapter {
             logger.info("Registered listener: {}", listener.getClass().getSimpleName());
         }
 
-        // Phase 5: mark init complete, then handle a READY that arrived earlier
         initComplete = true;
-        ReadyEvent re = capturedReadyEvent;
-        if (re != null) {
-            onBotReady(re);
+        ReadyEvent ready = capturedReadyEvent;
+        if (ready != null) {
+            onBotReady(ready);
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
@@ -106,37 +116,34 @@ public class Main extends ListenerAdapter {
         logger.info("Shutdown complete.");
     }
 
-    private void onBotReady(@Nonnull ReadyEvent event) {
-        if (!businessServicesStarted.compareAndSet(false, true)) return;
+    private void onBotReady(ReadyEvent event) {
+        if (!businessServicesStarted.compareAndSet(false, true)) {
+            return;
+        }
 
         logger.info("Bot is ready! Connected as {}", event.getJDA().getSelfUser().getAsTag());
+        if (!config.status().isBlank()) {
+            event.getJDA().getPresence().setActivity(Activity.playing(config.status()));
+        }
 
-        serviceManager.startAll(BUSINESS_SERVICES);
+        serviceManager.startAll(features.business());
         logger.info("Business services started.");
 
         Collection<CommandData> commands = commandRegister.getAllCommandsData();
-        logger.info("Registering {} commands...", commands.size());
-        event.getJDA()
-                .updateCommands()
-                .addCommands(commands)
-                .queue(
-                        ok -> logger.info("Commands registered successfully"),
-                        err -> logger.error("Failed to register commands: {}", err.getMessage()));
+        CommandPublisher.publish(shardManager, event.getJDA(), config, commands);
     }
 
-    private ShardManager buildShardManager(Dotenv dotenv) {
+    private ShardManager buildShardManager(BotConfig config) {
         DefaultShardManagerBuilder builder =
-                DefaultShardManagerBuilder.createDefault(dotenv.get("DISCORD_TOKEN"))
-                        .setAutoReconnect(AUTO_RECONNECT)
-                        .enableIntents(GATEWAY_INTENTS)
+                DefaultShardManagerBuilder.createDefault(config.token())
+                        .setAutoReconnect(config.autoReconnect())
+                        .enableIntents(config.intents())
                         .addEventListeners(
                                 new ListenerAdapter() {
 
                                     @Override
-                                    public void onReady(@Nonnull ReadyEvent event) {
+                                    public void onReady(ReadyEvent event) {
                                         capturedReadyEvent = event;
-                                        // If main-thread init already done, fire immediately (race
-                                        // where READY arrives after init)
                                         if (initComplete) {
                                             onBotReady(event);
                                         }
@@ -152,18 +159,26 @@ public class Main extends ListenerAdapter {
                                     }
 
                                     @Override
-                                    public void onException(@Nonnull ExceptionEvent event) {
+                                    public void onException(ExceptionEvent event) {
                                         logger.error("Exception in JDA", event.getCause());
-                                        Sentry.captureException(event.getCause());
+                                        if (config.sentryEnabled()) {
+                                            Sentry.captureException(event.getCause());
+                                        }
                                     }
                                 });
 
+        // One shard is the default. Setting the total only when asked keeps a normal bot on
+        // JDA's single-shard builder instead of a sharded login it does not need.
+        if (config.shards() > 1) {
+            builder.setShardsTotal(config.shards());
+        }
         return builder.build();
     }
 
-    private List<ListenerAdapter> instantiateListeners() {
+    private List<ListenerAdapter> instantiateListeners(
+            List<Class<? extends ListenerAdapter>> types) {
         List<ListenerAdapter> result = new ArrayList<>();
-        for (Class<? extends ListenerAdapter> cls : LISTENERS) {
+        for (Class<? extends ListenerAdapter> cls : types) {
             try {
                 result.add(injector.getInstance(cls));
                 logger.info("Instantiated listener: {}", cls.getSimpleName());
@@ -176,6 +191,6 @@ public class Main extends ListenerAdapter {
 
     @Override
     public void onReady(ReadyEvent event) {
-        // Handled inside the connectionListener in buildShardManager
+        // Handled by the listener installed in buildShardManager.
     }
 }

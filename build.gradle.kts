@@ -27,20 +27,17 @@ val mockitoAgent: Configuration by configurations.creating
 
 dependencies {
     implementation("net.dv8tion:JDA:6.5.0") { exclude(module = "opus-java") }
-    implementation("club.minnced:discord-webhooks:0.8.4") // Discord Webhooks
     implementation("com.google.inject:guice:7.0.0") // Dependency Injection
+    implementation("de.exlll:configlib-yaml:4.8.1")
     implementation("com.github.ben-manes.caffeine:caffeine:v3.2.2")
     implementation("com.github.ben-manes.caffeine:jcache:v3.2.2")
 
     // Preset files are JSON, parsed with the version JDA already resolves
     implementation("com.fasterxml.jackson.core:jackson-databind:2.19.1")
-    implementation("io.github.cdimascio:dotenv-java:3.2.0")
 
     implementation("ch.qos.logback:logback-classic:1.6.1")
     implementation("org.slf4j:slf4j-api:2.0.17")
     implementation("org.fusesource.jansi:jansi:2.4.2")
-
-    implementation("com.github.nguyenq:tess4j:tess4j-5.16.0") // Tessarect OCR
 
     // Hibernate ORM
     implementation(platform("org.hibernate.orm:hibernate-platform:7.4.5.Final"))

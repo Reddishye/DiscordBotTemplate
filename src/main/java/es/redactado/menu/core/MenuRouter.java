@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import net.dv8tion.jda.api.components.container.Container;
@@ -58,6 +59,7 @@ public final class MenuRouter implements AutoCloseable {
     private final PresetResolver presets;
     private final boolean ownsExecutor;
     private final boolean ownsSessions;
+    private final Semaphore flights;
     private final InteractionGuard guard = new InteractionGuard();
     private final Navigator navigator;
 
@@ -70,13 +72,15 @@ public final class MenuRouter implements AutoCloseable {
             Messages messages,
             PresetResolver presets,
             boolean ownsExecutor,
-            boolean ownsSessions) {
+            boolean ownsSessions,
+            int maxInFlight) {
         this.executor = executor;
         this.sessions = sessions;
         this.messages = messages;
         this.presets = presets;
         this.ownsExecutor = ownsExecutor;
         this.ownsSessions = ownsSessions;
+        this.flights = maxInFlight > 0 ? new Semaphore(maxInFlight) : null;
         this.navigator = new Navigator(this::get, sessions, messages, presets);
     }
 
@@ -107,8 +111,28 @@ public final class MenuRouter implements AutoCloseable {
         private SessionStore sessions;
         private Messages messages;
         private PresetResolver presets;
+        private int maxInFlight;
 
         private Builder() {}
+
+        /**
+         * Caps how many handler bodies may run at once.
+         *
+         * <p>Zero, the default, means no cap. A click that does not get a permit is answered
+         * with the busy message and does not run. The check happens before the acknowledgement.
+         *
+         * @param maxInFlight a positive limit, or zero for no limit
+         * @return this builder
+         * @throws IllegalArgumentException if {@code maxInFlight} is negative
+         */
+        public Builder maxInFlight(int maxInFlight) {
+            if (maxInFlight < 0) {
+                throw new IllegalArgumentException(
+                        "maxInFlight must be 0 or more, got " + maxInFlight);
+            }
+            this.maxInFlight = maxInFlight;
+            return this;
+        }
 
         /**
          * Sets the executor that runs handler bodies.
@@ -182,7 +206,8 @@ public final class MenuRouter implements AutoCloseable {
                     chosenMessages,
                     chosenPresets,
                     executor == null,
-                    sessions == null);
+                    sessions == null,
+                    maxInFlight);
         }
     }
 
@@ -272,7 +297,9 @@ public final class MenuRouter implements AutoCloseable {
         }
         Menu menu = registered.menu();
 
-        event.deferReply(ephemeral).queue();
+        if (!event.isAcknowledged()) {
+            event.deferReply(ephemeral).queue();
+        }
 
         return executor.supply(() -> renderFor(event, menu))
                 .thenCompose(future -> future)
@@ -492,6 +519,14 @@ public final class MenuRouter implements AutoCloseable {
             deferEdit(incoming.event());
             return false;
         }
+        if (flights != null && !flights.tryAcquire()) {
+            if (messageId != Incoming.NO_MESSAGE) {
+                guard.release(messageId);
+            }
+            Replies.ephemeral(
+                    incoming.event(), messages, incoming.locale(), MessageKeys.ERROR_BUSY);
+            return false;
+        }
         return true;
     }
 
@@ -593,11 +628,14 @@ public final class MenuRouter implements AutoCloseable {
     }
 
     private void releaseOnce(long messageId, AtomicBoolean released) {
-        if (messageId == NO_MESSAGE) {
+        if (!released.compareAndSet(false, true)) {
             return;
         }
-        if (released.compareAndSet(false, true)) {
+        if (messageId != NO_MESSAGE) {
             guard.release(messageId);
+        }
+        if (flights != null) {
+            flights.release();
         }
     }
 

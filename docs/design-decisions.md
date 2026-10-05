@@ -167,6 +167,41 @@ the dash. What the code *is* is in `docs/menus-inventory.md`; what is still open
 - `ButtonInteractionEvent.getMessage()` can be null for a message with no interaction metadata,
   which is how a shared channel message differs from a personal one.
 
+## Features
+
+- A bot adds a `BotFeature` instead of editing `Listeners`, `Services` or
+  `TemplateBindings`, because those files are the template's own contribution and a
+  fork that patches them cannot take an upstream change.
+- Features are found with `ServiceLoader`, one class name per line in
+  `META-INF/services/es.redactado.feature.BotFeature`, so a jar can contribute a feature
+  without this repository knowing the jar exists. `TemplateBindings` is installed by
+  `BotModule` and is not listed there.
+- `BotFeature.configure` opens an empty Guice set for every contribution kind before
+  `contribute()` runs. An empty bot still injects `Set<BaseSlashCommand>` and the rest;
+  a missing binder would fail startup for a feature that simply had nothing to add.
+- The template's listeners and services stay in the static lists. Features append, and
+  `FeatureCatalog` drops a class that appears twice. Replacing the lists would have
+  made the template's own tests depend on a service file.
+- Infrastructure services start before the gateway, business services after the first
+  ready event. The split is the same one `Services` already had: a service that needs
+  `ShardManager` cannot start in the first wave, because the shard manager is built
+  from the injector that is still starting those services.
+- A feature's settings are a separate YAML file next to `config.yml`. Folding every
+  bot's fields into `ConfigFile` would make the core record a grab bag, and a feature
+  in another jar could not add a field to it.
+- Environment variables overlay the loaded config in memory and are never written
+  back. A Compose file can set `BOT_TOKEN` without the container rewriting the mounted
+  file, and a blank variable must not wipe a value that was set on purpose.
+- SQL migrations are a small runner rather than Flyway. Flyway Community has no SQLite
+  module, and SQLite is the database a checkout uses before anyone provisions MariaDB.
+  Each dialect has its own scripts because the DDL is not the same.
+- A migration version is unique per dialect across every feature. Applying two scripts
+  with the same number would depend on classpath order, which is not an order anyone
+  wrote down.
+- `bot.shards` defaults to 1 and `setShardsTotal` is called only when the value is
+  higher. One shard is the right process until Discord requires more, and the template
+  does not guess a count from the gateway.
+
 ## Environment
 
 - Java 27 toolchain, Gradle 9.8.0 through the wrapper, JDA 6.5.0, Jackson Databind 2.19.1 at the

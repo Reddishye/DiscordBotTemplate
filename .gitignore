@@ -43,6 +43,7 @@ bin/
 .DS_Store
 
 *.env
+config.yml
 
 ### Local agent and tool directories ###
 .omo/

@@ -1,17 +1,9 @@
 package es.redactado.config;
 
-import es.redactado.database.repository.AbstractRepository;
-import java.util.List;
-
-public class Database {
-    public static final List<Class<?>> ENTITIES =
-            List.of(
-                    // Add your entity classes here
-                    );
-
-    public static final List<Class<? extends AbstractRepository<?, ?>>> REPOSITORIES =
-            List.of(
-                    // Add your repository classes here
-                    // They will be injected for later use
-                    );
+/**
+ * Persistent classes are contributed as {@link es.redactado.database.ManagedEntity} bindings.
+ * {@link TemplateBindings} registers the ones this template ships.
+ */
+public final class Database {
+    private Database() {}
 }

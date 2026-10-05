@@ -6,20 +6,8 @@
         </encoder>
     </appender>
 
-    <appender name="Sentry" class="io.sentry.logback.SentryAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] [%X{jda.shard}] %logger{0} %level %msg%n</pattern>
-        </encoder>
-    </appender>
-
-    <root level="debug">
-        <appender-ref ref="STDOUT" />
-        <appender-ref ref="Sentry" />
-    </root>
-
     <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <appender-ref ref="FILE" />
+        <appender-ref ref="STDOUT" />
     </root>
 
     <logger name="es.redactado.database" level="INFO" />

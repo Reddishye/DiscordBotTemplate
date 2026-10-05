@@ -2,6 +2,8 @@ package es.redactado.service;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import es.redactado.config.BotConfig;
+import es.redactado.database.DatabaseManager;
 import es.redactado.menu.api.Menu;
 import es.redactado.menu.core.MenuExecutor;
 import es.redactado.menu.core.MenuRouter;
@@ -13,7 +15,6 @@ import es.redactado.menu.preset.InMemoryPresetPreferences;
 import es.redactado.menu.preset.PresetPreferences;
 import es.redactado.menu.preset.PresetRegistry;
 import es.redactado.menu.preset.PresetStore;
-import io.github.cdimascio.dotenv.Dotenv;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
@@ -50,10 +51,13 @@ public class MenuService implements IService {
 
     private final TaskManager taskManager;
     private final MenuSettings settings;
+    private final DatabaseManager database;
 
     private volatile MenuRouter router;
     private volatile PresetRegistry registry;
     private volatile PresetPreferences preferences;
+    private volatile StoredPresetPreferences storedPreferences;
+    private volatile ChannelPanels panels;
     private volatile PresetStore presetStore;
     private volatile SessionStore sessions;
     private volatile ScheduledFuture<?> cleanUp;
@@ -64,19 +68,26 @@ public class MenuService implements IService {
      * @param dotenv where this template's settings come from
      */
     @Inject
-    public MenuService(TaskManager taskManager, Dotenv dotenv) {
-        this(taskManager, MenuSettings.from(dotenv));
+    public MenuService(TaskManager taskManager, BotConfig config, DatabaseManager database) {
+        this(taskManager, config.menu(), database);
     }
 
-    /** Visible for tests, which drive the settings directly rather than through a file. */
+    /** Visible for tests, which drive the settings directly and keep preferences in memory. */
     MenuService(TaskManager taskManager, MenuSettings settings) {
+        this(taskManager, settings, null);
+    }
+
+    private MenuService(TaskManager taskManager, MenuSettings settings, DatabaseManager database) {
         this.taskManager = taskManager;
         this.settings = settings;
+        this.database = database;
     }
 
     @Override
     public List<Class<? extends IService>> dependsOn() {
-        return List.of(TaskManager.class);
+        return database == null
+                ? List.of(TaskManager.class)
+                : List.of(TaskManager.class, DatabaseManager.class);
     }
 
     @Override
@@ -86,13 +97,23 @@ public class MenuService implements IService {
         }
 
         PresetRegistry startedRegistry = new PresetRegistry();
-        PresetPreferences chosenPreferences = new InMemoryPresetPreferences();
+        PresetPreferences chosenPreferences;
+        StoredPresetPreferences chosenStored = null;
+        ChannelPanels chosenPanels = null;
+        if (database == null) {
+            chosenPreferences = new InMemoryPresetPreferences();
+        } else {
+            chosenStored = new StoredPresetPreferences(database);
+            chosenPreferences = chosenStored;
+            chosenPanels = new ChannelPanels(database);
+        }
         SessionStore startedSessions =
                 new SessionStore(
                         new SessionConfig(settings.sessionMaxSize(), settings.sessionIdleTtl()));
         MenuRouter startedRouter =
                 MenuRouter.builder()
                         .executor(MenuExecutor.shared(taskManager.ioExecutor()))
+                        .maxInFlight(settings.maxInFlight())
                         .sessions(startedSessions)
                         .messages(Messages.standard())
                         .presets(
@@ -108,6 +129,8 @@ public class MenuService implements IService {
 
         this.registry = startedRegistry;
         this.preferences = chosenPreferences;
+        this.storedPreferences = chosenStored;
+        this.panels = chosenPanels;
         this.sessions = startedSessions;
         this.router = startedRouter;
         this.presetStore = startedStore;
@@ -156,6 +179,8 @@ public class MenuService implements IService {
         sessions = null;
         registry = null;
         preferences = null;
+        storedPreferences = null;
+        panels = null;
 
         // The router was given the task manager's executor to borrow, so closing it does
         // not touch that pool: close() only stops what it created.
@@ -202,15 +227,32 @@ public class MenuService implements IService {
     /**
      * Where guild and user preset choices are kept.
      *
-     * <p>In memory, so they reset on restart. A bot that wants them to survive a restart
-     * replaces this with its own implementation behind the same interface, in its own
-     * startup code.
+     * <p>When a database is available the choices are stored there. The test constructor keeps
+     * them in memory.
      *
      * @return the preferences in use
      * @throws IllegalStateException if this service is not running
      */
     public PresetPreferences preferences() {
         return require(preferences, "preferences");
+    }
+
+    /**
+     * Stores a guild's preset choice. Requires the service to be running with a database.
+     */
+    public CompletableFuture<Void> setGuildPreset(long guildId, String name) {
+        StoredPresetPreferences stored = require(storedPreferences, "stored preferences");
+        return stored.setGuild(guildId, name);
+    }
+
+    /** Stores a user's preset choice. Requires the service to be running with a database. */
+    public CompletableFuture<Void> setUserPreset(long userId, String name) {
+        return require(storedPreferences, "stored preferences").setUser(userId, name);
+    }
+
+    /** Shared channel messages this bot updates in place. */
+    public ChannelPanels panels() {
+        return require(panels, "channel panels");
     }
 
     /**

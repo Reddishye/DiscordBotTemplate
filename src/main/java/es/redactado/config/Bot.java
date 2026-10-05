@@ -1,17 +1,8 @@
 package es.redactado.config;
 
-import java.util.List;
-import net.dv8tion.jda.api.requests.GatewayIntent;
-
-public class Bot {
-    public static final boolean AUTO_RECONNECT = true;
-
-    public static final List<GatewayIntent> GATEWAY_INTENTS =
-            List.of(
-                    GatewayIntent.GUILD_MESSAGES,
-                    GatewayIntent.GUILD_MESSAGE_REACTIONS,
-                    GatewayIntent.GUILD_VOICE_STATES,
-                    GatewayIntent.GUILD_MEMBERS,
-                    GatewayIntent.GUILD_PRESENCES,
-                    GatewayIntent.DIRECT_MESSAGES);
+/**
+ * Gateway options now live in {@link BotConfig}, under {@code bot} in {@code config.yml}.
+ */
+public final class Bot {
+    private Bot() {}
 }

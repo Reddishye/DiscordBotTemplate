@@ -28,11 +28,7 @@ import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
  *       because its buttons are bound to whoever ran the command.
  * </ul>
  *
- * <p>To use it, add the class to {@code Commands.SLASH_COMMANDS}:
- *
- * <pre>{@code
- * List.of(PingCommand.class, ShowcaseCommand.class)
- * }</pre>
+ * <p>To use it, bind the class next to {@code PingCommand} in {@code TemplateBindings}.
  *
  * <p>and follow {@code docs/manual-test.md}, which walks the showcase by hand.
  */
@@ -53,6 +49,11 @@ public class ShowcaseCommand implements BaseSlashCommand {
         return Commands.slash("showcase", "Open the menu showcase")
                 .setNSFW(false)
                 .setContexts(InteractionContextType.GUILD, InteractionContextType.BOT_DM);
+    }
+
+    @Override
+    public boolean ephemeral() {
+        return true;
     }
 
     @Override

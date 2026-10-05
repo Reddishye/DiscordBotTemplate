@@ -4,9 +4,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Base class for all domain entities. This class contains common fields such as id, createdAt, and
@@ -16,18 +19,22 @@ import org.hibernate.annotations.UpdateTimestamp;
 public abstract class BaseDomain {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @JdbcTypeCode(SqlTypes.INTEGER)
+    private Integer id;
 
     @CreationTimestamp private Instant createdAt;
 
     @UpdateTimestamp private Instant updatedAt;
 
+    /** Optimistic lock. Two interactions cannot silently overwrite the same row. */
+    @Version private long version;
+
     // Getters and setters
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -45,5 +52,9 @@ public abstract class BaseDomain {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public long getVersion() {
+        return version;
     }
 }

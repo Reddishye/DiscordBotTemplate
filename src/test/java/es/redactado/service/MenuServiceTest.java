@@ -10,10 +10,12 @@ import static org.mockito.Mockito.when;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import es.redactado.config.BotConfig;
+import es.redactado.config.ConfigFile;
 import es.redactado.config.Services;
+import es.redactado.config.TemplateBindings;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.core.MenuRouter;
-import io.github.cdimascio.dotenv.Dotenv;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 import net.dv8tion.jda.api.components.container.Container;
@@ -56,8 +58,7 @@ class MenuServiceTest {
     }
 
     private static MenuSettings settings() {
-        return MenuSettings.from(Dotenv.configure().ignoreIfMissing().load())
-                .withCleanUpInterval(java.time.Duration.ofMillis(50));
+        return MenuSettings.defaults().withCleanUpInterval(java.time.Duration.ofMillis(50));
     }
 
     @Nested
@@ -190,79 +191,29 @@ class MenuServiceTest {
         @Test
         @DisplayName("defaults apply when nothing is set")
         void defaults() {
-            MenuSettings parsed = MenuSettings.from(Dotenv.configure().ignoreIfMissing().load());
+            MenuSettings parsed = MenuSettings.defaults();
 
             assertThat(parsed.presetsDirectory().toString()).isEqualTo("presets");
             assertThat(parsed.sessionMaxSize()).isEqualTo(50_000L);
             assertThat(parsed.sessionIdleTtl()).isEqualTo(java.time.Duration.ofMinutes(30));
             assertThat(parsed.userPresetsEnabled()).isFalse();
             assertThat(parsed.defaultPreset()).isEqualTo("default");
-        }
-
-        @Test
-        @DisplayName("every setting can be overridden")
-        void overrides() {
-            Dotenv dotenv =
-                    dotenv(
-                            "MENU_PRESETS_DIR=/etc/looks",
-                            "MENU_SESSION_MAX_SIZE=10",
-                            "MENU_SESSION_IDLE_TTL=90s",
-                            "MENU_USER_PRESETS_ENABLED=yes",
-                            "MENU_DEFAULT_PRESET=midnight");
-
-            MenuSettings parsed = MenuSettings.from(dotenv);
-
-            assertThat(parsed.presetsDirectory().toString()).isEqualTo("/etc/looks");
-            assertThat(parsed.sessionMaxSize()).isEqualTo(10L);
-            assertThat(parsed.sessionIdleTtl()).isEqualTo(java.time.Duration.ofSeconds(90));
-            assertThat(parsed.userPresetsEnabled()).isTrue();
-            assertThat(parsed.defaultPreset()).isEqualTo("midnight");
-        }
-
-        @Test
-        @DisplayName("a duration accepts minutes, seconds, hours and milliseconds")
-        void durationForms() {
-            assertThat(MenuSettings.from(dotenv("MENU_SESSION_IDLE_TTL=2h")).sessionIdleTtl())
-                    .isEqualTo(java.time.Duration.ofHours(2));
-            assertThat(MenuSettings.from(dotenv("MENU_SESSION_IDLE_TTL=45m")).sessionIdleTtl())
-                    .isEqualTo(java.time.Duration.ofMinutes(45));
-            assertThat(MenuSettings.from(dotenv("MENU_SESSION_IDLE_TTL=500ms")).sessionIdleTtl())
-                    .isEqualTo(java.time.Duration.ofMillis(500));
-            assertThat(MenuSettings.from(dotenv("MENU_SESSION_IDLE_TTL=5")).sessionIdleTtl())
-                    .as("a bare number means minutes")
-                    .isEqualTo(java.time.Duration.ofMinutes(5));
-        }
-
-        @Test
-        @DisplayName("a bad value fails fast, naming the setting")
-        void badValuesFailFast() {
-            assertThatThrownBy(() -> MenuSettings.from(dotenv("MENU_SESSION_MAX_SIZE=many")))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("MENU_SESSION_MAX_SIZE")
-                    .hasMessageContaining("many");
-            assertThatThrownBy(() -> MenuSettings.from(dotenv("MENU_SESSION_MAX_SIZE=0")))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("MENU_SESSION_MAX_SIZE");
-            assertThatThrownBy(() -> MenuSettings.from(dotenv("MENU_SESSION_IDLE_TTL=soon")))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("MENU_SESSION_IDLE_TTL")
-                    .hasMessageContaining("30m");
-            assertThatThrownBy(() -> MenuSettings.from(dotenv("MENU_USER_PRESETS_ENABLED=perhaps")))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("MENU_USER_PRESETS_ENABLED");
-            assertThatThrownBy(() -> MenuSettings.from(dotenv("MENU_DEFAULT_PRESET=  ")))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("MENU_DEFAULT_PRESET");
+            assertThat(parsed.maxInFlight()).isZero();
         }
 
         @Test
         @DisplayName("a missing presets directory is fine, the built-in presets still work")
         void missingPresetDirectoryIsFine() {
-            MenuService withMissingDirectory =
-                    new MenuService(
-                            taskManager,
-                            MenuSettings.from(dotenv("MENU_PRESETS_DIR=/nowhere/at/all"))
-                                    .withCleanUpInterval(java.time.Duration.ofMillis(50)));
+            MenuSettings missing =
+                    new MenuSettings(
+                            java.nio.file.Path.of("/nowhere/at/all"),
+                            50_000L,
+                            java.time.Duration.ofMinutes(30),
+                            false,
+                            "default",
+                            java.time.Duration.ofMillis(50),
+                            0);
+            MenuService withMissingDirectory = new MenuService(taskManager, missing);
             try {
                 withMissingDirectory.init();
 
@@ -277,33 +228,32 @@ class MenuServiceTest {
 
     // ------------------------------------------------------------- fixtures
 
-    /**
-     * A dotenv over fixed {@code KEY=VALUE} strings, so a test sets exactly what it is
-     * about and nothing else.
-     */
-    private static Dotenv dotenv(String... assignments) {
-        Dotenv dotenv = mock(Dotenv.class);
-        java.util.Map<String, String> values = new java.util.HashMap<>();
-        for (String assignment : assignments) {
-            int equals = assignment.indexOf('=');
-            values.put(assignment.substring(0, equals), assignment.substring(equals + 1));
-        }
-        Mockito.when(dotenv.get(Mockito.anyString()))
-                .thenAnswer(call -> values.get(call.getArgument(0, String.class)));
-        Mockito.when(dotenv.get(Mockito.anyString(), Mockito.anyString()))
-                .thenAnswer(
-                        call ->
-                                values.getOrDefault(
-                                        call.getArgument(0, String.class),
-                                        call.getArgument(1, String.class)));
-        return dotenv;
+    private static BotConfig testConfig() {
+        ConfigFile defaults = new ConfigFile();
+        return BotConfig.from(
+                new ConfigFile(
+                        defaults.bot(),
+                        new ConfigFile.DatabaseFile(
+                                "SQLITE",
+                                "localhost",
+                                3306,
+                                "bot",
+                                "",
+                                "",
+                                "build/menu-service-test-db"),
+                        defaults.pool(),
+                        defaults.hibernate(),
+                        defaults.menu(),
+                        defaults.commands(),
+                        defaults.sentry()));
     }
 
     /** The injector the template builds, without the gateway it would otherwise need. */
     private static final class TestModule extends com.google.inject.AbstractModule {
         @Override
         protected void configure() {
-            bind(Dotenv.class).toInstance(dotenv());
+            bind(BotConfig.class).toInstance(testConfig());
+            install(new TemplateBindings());
         }
     }
 

@@ -8,7 +8,11 @@ public interface Repository<T, ID> {
 
     Optional<T> findById(ID id);
 
-    List<T> findAll();
+    /**
+     * A bounded page. {@code limit} is at most 200 so a caller cannot pull the table into memory
+     * by accident.
+     */
+    List<T> findRange(int offset, int limit);
 
     void delete(T entity);
 

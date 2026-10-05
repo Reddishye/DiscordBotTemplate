@@ -37,12 +37,21 @@ class MenuDependencyTest {
     /**
      * Integration code allowed to import the template's services, relative to the source root.
      *
-     * <p>Only the listener. {@code MenuService} and {@code MenuSettings} are inside
-     * {@code es.redactado.service} and so cannot import it; they need no exemption, which is
-     * why this list is short. The listener is the one integration class that lives outside
-     * the package and needs the executor's owner.
+     * <p>{@code MenuService} and {@code MenuSettings} are inside {@code es.redactado.service}
+     * and so cannot import it. The classes listed here live outside that package and still
+     * need a service: the listeners, the config record that builds menu settings, and the
+     * database, which runs work on the task manager.
      */
-    private static final List<String> INTEGRATION = List.of("command/handler/MenuListener.java");
+    private static final List<String> INTEGRATION =
+            List.of(
+                    "command/handler/MenuListener.java",
+                    "command/handler/CommandListener.java",
+                    "config/BotConfig.java",
+                    "database/DatabaseManager.java",
+                    "feature/BotFeature.java",
+                    "feature/FeatureCatalog.java",
+                    "feature/InfrastructureService.java",
+                    "feature/BusinessService.java");
 
     /**
      * Template files that already imported the services before the menu system existed.

@@ -1,0 +1,71 @@
+# Generated on first start as config.yml, which is gitignored.
+# Any BOT_* variable overrides the matching field. A blank variable does not.
+# See EnvOverlay for the names. DISCORD_TOKEN and DB_* still work when BOT_* is unset.
+
+bot:
+  # Bot token. Prefer BOT_TOKEN in the environment when running under Compose.
+  token: change-me
+  # Gateway intents. Privileged intents are left out of the default.
+  intents:
+    - GUILD_MESSAGES
+    - GUILD_MESSAGE_REACTIONS
+    - DIRECT_MESSAGES
+  # Presence text. Empty means no presence is set.
+  status: ''
+  # Reconnect after a gateway drop.
+  autoReconnect: true
+  # How many gateway shards to open. 1 is enough until Discord asks for more.
+  shards: 1
+
+database:
+  # SQLITE, MARIADB, or H2.
+  type: SQLITE
+  host: localhost
+  port: 3306
+  name: redactado
+  user: root
+  # Prefer BOT_DATABASE_PASSWORD in the environment.
+  password: ''
+  # Directory for SQLITE and H2 files.
+  path: ./database
+
+pool:
+  minIdle: 1
+  # SQLITE is forced to 1, because it serializes writes.
+  maxSize: 10
+  idleTimeoutMillis: 30000
+  maxLifetimeMillis: 1800000
+  connectionTimeoutMillis: 30000
+  leakDetectionMillis: 60000
+
+hibernate:
+  showSql: false
+  formatSql: false
+  highlightSql: false
+  # JDBC batch size for inserts and updates.
+  batchSize: 50
+  # VALIDATE runs migrations then checks the schema. UPDATE is for a throwaway local file.
+  schema: VALIDATE
+
+menu:
+  presetsDirectory: presets
+  sessionMaxSize: 50000
+  # Duration: 30m, 90s, 2h, 500ms, or a bare number of minutes.
+  sessionIdleTtl: 30m
+  userPresetsEnabled: false
+  defaultPreset: default
+  # How many menu handlers may run at once. 0 means no cap.
+  maxInFlight: 0
+
+commands:
+  # GUILD registers on commands.guildId. GLOBAL registers once, from shard 0.
+  scope: GUILD
+  # Required when scope is GUILD. 0 skips registration and logs why.
+  guildId: 0
+  # Applied when a command does not set its own. 0s disables cooldowns.
+  defaultCooldown: 0s
+
+sentry:
+  enabled: false
+  # Prefer BOT_SENTRY_DSN in the environment.
+  dsn: ''

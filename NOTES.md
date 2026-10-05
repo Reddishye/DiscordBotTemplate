@@ -8,10 +8,9 @@ architecture are in `docs/menus-inventory.md`.
 
 Each entry states the question and the default that applies until it is answered.
 
-- **Preset preference storage.** Guild and user preferences live in
-  `InMemoryPresetPreferences` and reset on restart. A persistent implementation would sit
-  behind the same interface and would need a migration and a repository binding, neither of
-  which the template has.
+- **Preset preference storage.** Guild and user preferences are stored in
+  `preset_preference` when `MenuService` is started with the database. The in-memory
+  implementation remains for tests and for a service constructed without one.
 - **Over-limit renders.** `Validator` reports a container over the limit, and
   `ValidationResult.throwIfInvalid()` turns it into an exception. Whether a running bot should
   render the oversized container anyway rather than fail the interaction has not been decided;
@@ -30,11 +29,11 @@ Each entry states the question and the default that applies until it is answered
 - **No global concurrency cap.** `MenuRouter.close()` releases the executor and drains the
   sessions; it does not cap how many handlers may run at once across all messages. A global cap
   would need a policy for what happens to the interactions that do not get a slot.
-- **No shared channel panel.** A menu can be opened in a channel rather than in a private
-  message, and a channel message carries no owner, so it is a shared menu with its buttons
-  visible to everyone. There is no per-channel panel that a menu can update in place.
-- **Per-guild and per-user preset preferences are not persisted.** `PresetPreferences` has an
-  in-memory implementation only, so a preference resets when the bot restarts.
+- **Shared channel panels remember one message.** `ChannelPanels.publish` edits the stored
+  message for a guild, channel and menu. The caller still renders the container. A channel
+  message has no owner, so its buttons stay visible to everyone.
+- **Per-guild and per-user preset preferences are persisted** in `preset_preference` for the
+  service the bot starts. A menu service built without a database still keeps them in memory.
 
 ## Verified baseline
 

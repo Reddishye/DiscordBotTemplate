@@ -46,13 +46,14 @@ src/main/java/es/redactado/
   Main.java                 entry point: shard manager, injector, services,
                             listeners, shutdown hook
   BotModule.java            Guice bindings
-  command/                  slash commands, handlers, base types
-  config/                   Bot, Commands, Database, Listeners, Services
-  database/                 DatabaseManager, model, repository
+  command/                  slash, message and user commands, and their dispatch
+  config/                   config.yml, env overrides, and the template's own feature
+  database/                 sessions, migrations, model, repository
+  feature/                  how a bot adds commands, listeners, services and SQL
   service/                  IService, ServiceManager, TaskManager, MenuService
   menu/                     the menu framework, see "Menus" below
 src/main/resources/
-  .env.example              configuration
+  config.example.yml       configuration sample
   logback.xml               logging
   menu/messages.properties  English strings
   menu/messages_es.properties  Spanish strings
@@ -66,29 +67,26 @@ docs/
 
 ### Configuration
 
-Configuration is a `.env` file next to the build, loaded by `dotenv-java`. Copy the
-example and edit it:
+Settings live in `config.yml`, written on first start from the defaults in
+`config.example.yml`. The token can sit in that file. Every field can also be set
+from the environment, which is what a Compose file should use: `BOT_TOKEN` overrides
+`bot.token`, `BOT_DATABASE_HOST` overrides `database.host`, and so on, following the
+path. A blank variable does not override. The merged result is never written back
+into the file.
 
-```
-cp src/main/resources/.env.example .env
-```
+`CONFIG_FILE` chooses a path other than `config.yml`. The older `DISCORD_TOKEN` and
+`DB_*` names still apply when the matching `BOT_*` name is unset. `bot.shards`
+(or `BOT_SHARDS`) is the gateway shard count; `1` leaves JDA on a single shard.
 
-| Setting | Meaning | Default |
-| --- | --- | --- |
-| `DISCORD_TOKEN` | the bot token | required |
-| `DB_TYPE` | `SQLITE`, `MARIADB` or `H2` | `SQLITE` |
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | connection for `MARIADB` | as in the example |
-| `DB_PATH` | directory for the file databases | `./database` |
-| `HIBERNATE_SHOW_SQL`, `HIBERNATE_FORMAT_SQL`, `HIBERNATE_HIGHLIGHT_SQL` | SQL logging | as in the example |
-| `MENU_PRESETS_DIR` | directory of custom preset files | `presets` |
-| `MENU_SESSION_MAX_SIZE` | how many menu sessions are retained | `50000` |
-| `MENU_SESSION_IDLE_TTL` | how long an untouched session lives | `30m` |
-| `MENU_USER_PRESETS_ENABLED` | whether a user's own preset choice may override their guild's | `false` |
-| `MENU_DEFAULT_PRESET` | the preset used when nothing else applies | `default` |
+A feature that needs its own settings uses `ConfigFiles.load` with a record. That
+writes a separate YAML file beside `config.yml`, so the core file does not grow a
+field for every bot.
 
-The `MENU_*` settings are read once, by `MenuService`, through the same `Dotenv`
-object every other service uses. A value that is present but unusable fails
-startup naming the setting, so the operator knows which line to fix.
+A value that is present but unusable fails startup and names the setting. SQLite is
+the local default and is given a connection pool of one. `commands.scope` is `GUILD`
+or `GLOBAL`. A guild id of `0` skips registration until you set one.
+`hibernate.schema` is `VALIDATE` (run the SQL migrations, then check) or `UPDATE`
+(Hibernate may alter a throwaway local file).
 
 ### Running
 
@@ -96,7 +94,7 @@ startup naming the setting, so the operator knows which line to fix.
 ./gradlew run
 ```
 
-`Main.run()` redirects standard output into the logger, loads `.env`, builds the
+`Main.run()` redirects standard output into the logger, loads `config.yml`, builds the
 shard manager, builds the Guice injector, starts the infrastructure services,
 registers the listeners, and installs a shutdown hook.
 
@@ -117,8 +115,10 @@ Two kinds of test are left out of that command on purpose:
 
 ### Services and their start order
 
-Services implement `IService` (`init`, `shutdown`, `dependsOn`) and are declared as
-two lists in `config/Services.java`:
+Services implement `IService` (`init`, `shutdown`, `dependsOn`). The template's
+own services stay in `config/Services.java`. A feature appends more with
+`BotFeature.infrastructure` and `BotFeature.business`; `FeatureCatalog` merges both
+and drops duplicates.
 
 | List | When | What may use it |
 | --- | --- | --- |
@@ -154,39 +154,76 @@ not exist.
 `IllegalStateException` before `init()`, which is the same contract as the rest of
 the manager: an accessor has no future to fail, so it fails at the call.
 
-### Listeners and commands
+### Adding a feature
 
-Listeners come from the static list `config/Listeners.java`. `Main` asks the
-injector for each entry and registers it with the shard manager. Commands that are
-also listeners, for autocomplete, are appended from `CommandRegister`.
+The template is a starting process, not a finished bot. Ping, the menu listener
+and the two tables it ships are examples of the same mechanism you use for
+everything else. You do not edit `Listeners`, `Services` or `TemplateBindings`
+to grow the bot. You write a feature.
 
-Commands are declared in `config/Commands.java`: `SLASH_COMMANDS` for slash
-commands and `MESSAGE_CONTEXT_COMMANDS` for the ones that act on a message. Both
-have a matching `..._CONSUMERS` hook for per-command setup.
+A feature is a class that extends `BotFeature` and, in `contribute()`, names
+what it brings:
 
-`CommandListener` is the template's convention for anything asynchronous: take
-the event on the JDA thread, hand the work to a virtual thread, acknowledge before
-doing the work, and route a failure to one ephemeral reply plus
-`Sentry.captureException`.
+- `slashCommand`, `messageCommand` and `userCommand` for the three command
+  kinds Discord has. `CommandRegister` indexes them by name, and
+  `CommandListener` acknowledges the interaction, runs the handler off the
+  gateway thread, and turns a failure into one ephemeral reply.
+- `listener` for a `ListenerAdapter` that is not a command. The template always
+  registers `CommandListener` and `MenuListener`; yours are added beside them.
+- `infrastructure` for a service that must exist before the gateway connects
+  (a cache, a client, a repository). It must not touch `ShardManager`, because
+  the shard manager does not exist yet.
+- `business` for a service that needs guilds or the Discord API. It starts
+  after the first ready event.
+- `entity` for a Hibernate class. `DatabaseManager` maps every entity any
+  feature registered.
+- `migration` for a SQL script. Give it the dialect (`sqlite`, `h2` or
+  `mariadb`), a version number and a classpath resource. Ship a script for
+  each dialect you actually run. Version 1 belongs to the template, so start
+  at 2. Two scripts that claim the same version for the same dialect stop
+  startup, which is better than silently applying them in an arbitrary order.
+
+`TemplateBindings` is the feature this repository already installs. Yours is
+discovered on its own: put the class name, one per line, in
+`META-INF/services/es.redactado.feature.BotFeature`. A separate jar on the
+classpath is enough. The template does not have a list of features to update.
+
+`FeatureCatalog` then builds the three lists `Main` actually starts: the
+template's services and listeners first, then whatever features added. A class
+that shows up twice is started once. `ServiceManager` still honours
+`dependsOn()`, so declaring a service does not decide its order.
+
+Settings that belong to one feature stay out of `config.yml`. Inject
+`ConfigFiles` and call `load` with a record. ConfigLib writes that record to
+its own YAML file in the same directory as `config.yml`, with the record's
+defaults and comments, and reads it back on the next start. The core file is
+only the process: token, database, pool, commands, menu, sentry, shards.
+
+`bot.shards` (or `BOT_SHARDS`) is how many gateway shards to open. Leave it at
+1 until Discord tells you the bot needs more. The template does not ask
+Discord for a recommended count.
 
 ### The database layer
 
-`DatabaseManager` builds a Hibernate `SessionFactory` from the `DB_*` settings,
-using `hibernate-hikaricp` for pooling and `hibernate-jcache` with Caffeine as the
-second-level cache. `config/Database.java` declares the entities; each has a
-repository in `database/repository/`, and the repositories are bound in
-`BotModule` as a set.
+`DatabaseManager` builds a Hibernate `SessionFactory` from the database section of
+`config.yml`, using `hibernate-hikaricp` for pooling and `hibernate-jcache` with
+Caffeine as the second-level cache. Entities are `ManagedEntity` bindings from a
+`BotFeature` (`TemplateBindings` registers the ones this template ships). SQL for
+`sqlite`, `h2` and `mariadb` lives under `db/migration`, and a feature adds a
+script with `BotFeature.migration`. Two scripts for the same dialect and version
+fail startup.
 
-Repositories return `CompletableFuture`, which is why the menu framework has a
-loader rather than a synchronous getter: a blocking repository is reached through
-`MenuExecutor.supply`, which keeps the JDA thread free and bounds the real
-concurrency at the connection pool.
+A use case calls `DatabaseManager.inTransaction` or `inTransactionAsync`. The async
+form runs on `TaskManager`'s I/O executor, which keeps JDBC off a JDA thread. The
+Hikari pool, not the virtual threads, bounds how many queries run at once. Repository
+methods each open one transaction; a read and a write that belong together share one
+call to `inTransaction` instead.
 
 ### How DI scopes services
 
 `BotModule` binds `Main`, `ShardManager`, `ServiceManager`, `CommandRegister`, an
-eager `DatabaseManager`, every repository, the `MenuService` and the
-`MenuListener`, and provides a `@Singleton Dotenv`. Everything is constructor
+`DatabaseManager`, every feature module, the `MenuService` and the
+`MenuListener`, and binds the loaded `BotConfig`. Everything is constructor
 injection; the only field injection in the project is in tests, where Mockito
 builds the object.
 
@@ -743,8 +780,13 @@ public class ShowcaseCommand implements BaseSlashCommand {
                 .setContexts(InteractionContextType.GUILD, InteractionContextType.BOT_DM);
     }
 
-    @Override
-    public void handle(SlashCommandInteractionEvent event) {
+        @Override
+        public boolean ephemeral() {
+            return true;
+        }
+
+        @Override
+        public void handle(SlashCommandInteractionEvent event) {
         menuService.register(new ShowcaseMenu(menuService.presets()));
         menuService.open(event, "showcase", true);
     }
@@ -764,12 +806,12 @@ Back walks:
 return ctx.navigate(NavigationMode.PUSH, new NavEntry(ID, view, List.of()));
 ```
 
-### A shared channel panel is not implemented
+### A shared channel panel
 
-A menu can be opened in a channel rather than in a private message, and a channel
-message carries no owner, so it is a shared menu with its buttons visible to
-everyone. There is no per-channel panel that a menu can update in place, which
-means a menu shown in a channel is a message, not a surface.
+A channel message has no owner, so its buttons are visible to everyone.
+`ChannelPanels.publish` stores one message id per guild, channel and menu, and
+the next publish edits that message. Render the container first, then hand it
+over. A deleted message is sent again and the stored id is replaced.
 
 ## Performance and concurrency
 

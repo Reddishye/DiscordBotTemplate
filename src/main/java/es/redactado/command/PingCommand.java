@@ -17,34 +17,7 @@ public class PingCommand implements BaseSlashCommand {
 
     @Override
     public void handle(SlashCommandInteractionEvent event) {
-        // Defer the reply to show "Bot is thinking..." indicator
-        event.deferReply().queue();
-
-        // Measure the time it takes for the API to process the command
-        long startTime = System.currentTimeMillis();
-
-        // Calculate response time
-        long responseTime = System.currentTimeMillis() - startTime;
-
-        // Get the gateway ping (WebSocket connection latency)
         long gatewayPing = event.getJDA().getGatewayPing();
-
-        // Send a detailed response with both response time and gateway ping
-        event.getHook()
-                .sendMessage(
-                        String.format(
-                                "`"
-                                        + Character.toString(0x1F3D3)
-                                        + "` Pong!\n"
-                                        + "`"
-                                        + Character.toString(0x23F1)
-                                        + "\uFE0F"
-                                        + "` Response time: %d ms\n"
-                                        + "`"
-                                        + Character.toString(0x1F310)
-                                        + "` Gateway ping: %d ms",
-                                responseTime,
-                                gatewayPing))
-                .queue();
+        event.getHook().sendMessage("Pong. Gateway ping: " + gatewayPing + " ms").queue();
     }
 }
