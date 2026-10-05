@@ -33,7 +33,7 @@ dependencies {
     implementation("com.github.ben-manes.caffeine:jcache:v3.2.2")
 
     // Preset files are JSON, parsed with the version JDA already resolves
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.19.1")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.3")
 
     implementation("ch.qos.logback:logback-classic:1.6.1")
     implementation("org.slf4j:slf4j-api:2.0.17")
