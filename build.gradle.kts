@@ -56,7 +56,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.50.3.0")
     implementation("com.h2database:h2:2.4.240")
 
-    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.mockito:mockito-core:5.14.2")
     testImplementation("org.mockito:mockito-junit-jupiter:5.14.2")
