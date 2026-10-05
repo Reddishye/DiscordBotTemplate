@@ -51,7 +51,7 @@ dependencies {
     implementation("jakarta.transaction:jakarta.transaction-api")
 
     // Database Drivers
-    implementation("com.zaxxer:HikariCP:7.0.2")
+    implementation("com.zaxxer:HikariCP:7.1.0")
     implementation("org.mariadb.jdbc:mariadb-java-client:3.5.7")
     implementation("org.xerial:sqlite-jdbc:3.50.3.0")
     implementation("com.h2database:h2:2.4.240")
