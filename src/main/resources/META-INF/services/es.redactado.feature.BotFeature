@@ -1,5 +1,3 @@
-# Features discovered at startup, one public BotFeature subclass per line.
-# Example:
-#   com.example.welcome.WelcomeFeature
-# TemplateBindings is installed by BotModule and must not be listed here.
-# A file with only comments is an empty bot, which is what a fresh checkout is.
+# One BotFeature subclass per line, for a class that lives in another jar.
+# This template's registrations are in es.redactado.config.TemplateBindings.
+# com.example.welcome.WelcomeFeature

@@ -7,7 +7,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import es.redactado.config.Listeners;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import es.redactado.config.BotConfig;
+import es.redactado.config.TemplateBindings;
+import es.redactado.feature.FeatureCatalog;
 import es.redactado.menu.core.MenuRouter;
 import es.redactado.service.MenuService;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
@@ -81,7 +85,19 @@ class MenuListenerTest {
     @Test
     @DisplayName("it is in the template's listener list")
     void itIsRegistered() {
-        assertThat(Listeners.LISTENERS).contains(MenuListener.class);
+        assertThat(
+                        Guice.createInjector(
+                                        new AbstractModule() {
+                                            @Override
+                                            protected void configure() {
+                                                bind(BotConfig.class)
+                                                        .toInstance(BotConfig.defaults());
+                                                install(new TemplateBindings());
+                                            }
+                                        })
+                                .getInstance(FeatureCatalog.class)
+                                .listeners())
+                .contains(MenuListener.class);
         assertThat(MenuListener.class).isAssignableTo(ListenerAdapter.class);
     }
 

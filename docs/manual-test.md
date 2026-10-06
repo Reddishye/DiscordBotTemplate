@@ -203,12 +203,11 @@ template's real command conventions so it compiles as-is.
 
 The class is already written and compiled, at
 `src/test/java/es/redactado/command/ShowcaseCommand.java`. Copy it into
-`src/main/java/es/redactado/command/` and add it to `SLASH_COMMANDS` in
-`src/main/java/es/redactado/config/Commands.java`:
+`src/main/java/es/redactado/command/` and add this line in
+`TemplateBindings.contribute()`, next to `PingCommand`:
 
 ```java
-public static final List<Class<? extends BaseSlashCommand>> SLASH_COMMANDS =
-        List.of(PingCommand.class, ShowcaseCommand.class);
+slashCommand(ShowcaseCommand.class);
 ```
 
 The command itself:
@@ -231,6 +230,11 @@ public class ShowcaseCommand implements BaseSlashCommand {
     }
 
     @Override
+    public boolean ephemeral() {
+        return true;
+    }
+
+    @Override
     public void handle(SlashCommandInteractionEvent event) {
         menuService.register(new ShowcaseMenu(menuService.presets()));
         menuService.open(event, "showcase", true);
@@ -247,7 +251,7 @@ public class ShowcaseCommand implements BaseSlashCommand {
   sees the menu. Pass `false` for a shared board.
 - **The showcase reads `menuService.presets()`** so the preset picker lists your custom
   presets as well as the five built-in ones.
-- **Delete both files when you are done.** The showcase is an example, not a feature.
+- **Remove the line and the copied class when you are done.** The showcase is an example.
 
 ### 3. The simple-menu examples
 

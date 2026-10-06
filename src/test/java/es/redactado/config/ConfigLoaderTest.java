@@ -38,6 +38,21 @@ class ConfigLoaderTest {
     }
 
     @Test
+    void environmentNamesFollowTheYamlPath() {
+        BotConfig config =
+                ConfigLoader.load(
+                        dir.resolve("config.yml"),
+                        Map.of(
+                                "BOT_DATABASE_NAME", "guilds",
+                                "BOT_SHARDS", "3",
+                                "BOT_COMMANDS_GUILD_ID", "42"));
+
+        assertThat(config.dbName()).isEqualTo("guilds");
+        assertThat(config.shards()).isEqualTo(3);
+        assertThat(config.commandGuildId()).isEqualTo(42L);
+    }
+
+    @Test
     void blankEnvironmentDoesNotOverride() {
         BotConfig config = ConfigLoader.load(dir.resolve("config.yml"), Map.of("BOT_TOKEN", "  "));
 

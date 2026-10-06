@@ -12,8 +12,8 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
  * Settings the running bot actually uses, after the YAML file and the environment have been
  * merged and checked.
  *
- * <p>Built once at startup. A SQLite database is given a pool of one here, so later code can
- * trust {@link #pool()} instead of remembering the rule.
+ * <p>Built once at startup from {@link ConfigFile}. A SQLite database is given a pool of one.
+ * The rest of the bot reads this record.
  */
 public record BotConfig(
         String token,

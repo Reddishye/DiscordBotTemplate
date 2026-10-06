@@ -1,71 +1,88 @@
-# Generated on first start as config.yml, which is gitignored.
-# Any BOT_* variable overrides the matching field. A blank variable does not.
-# See EnvOverlay for the names. DISCORD_TOKEN and DB_* still work when BOT_* is unset.
+# Written as config.yml on first start. config.yml is gitignored.
+# Each comment names the environment variable that overrides that value.
+# A blank variable does not override. The file is not rewritten.
 
 bot:
-  # Bot token. Prefer BOT_TOKEN in the environment when running under Compose.
+  # Discord bot token. Environment: BOT_TOKEN.
   token: change-me
-  # Gateway intents. Privileged intents are left out of the default.
+  # Gateway intent names, one per line. Environment: BOT_INTENTS, as a comma-separated list.
   intents:
     - GUILD_MESSAGES
     - GUILD_MESSAGE_REACTIONS
     - DIRECT_MESSAGES
-  # Presence text. Empty means no presence is set.
+  # Status text. Empty shows no status. Environment: BOT_STATUS.
   status: ''
-  # Reconnect after a gateway drop.
+  # Reconnect after the gateway drops. Environment: BOT_AUTO_RECONNECT.
   autoReconnect: true
-  # How many gateway shards to open. 1 is enough until Discord asks for more.
+  # Gateway shards to open. 1 is a single process. Environment: BOT_SHARDS.
   shards: 1
 
 database:
-  # SQLITE, MARIADB, or H2.
+  # SQLITE, MARIADB or H2. Environment: BOT_DATABASE_TYPE.
   type: SQLITE
+  # MariaDB hostname. Unused for SQLITE and H2. Environment: BOT_DATABASE_HOST.
   host: localhost
+  # MariaDB port. Unused for SQLITE and H2. Environment: BOT_DATABASE_PORT.
   port: 3306
+  # Database name. Environment: BOT_DATABASE_NAME.
   name: redactado
+  # MariaDB user. Unused for SQLITE and H2. Environment: BOT_DATABASE_USER.
   user: root
-  # Prefer BOT_DATABASE_PASSWORD in the environment.
+  # MariaDB password. Environment: BOT_DATABASE_PASSWORD.
   password: ''
-  # Directory for SQLITE and H2 files.
+  # Folder for the SQLITE or H2 file. Environment: BOT_DATABASE_PATH.
   path: ./database
 
 pool:
+  # Connections kept idle. SQLITE always runs with 1. Environment: BOT_POOL_MIN_IDLE.
   minIdle: 1
-  # SQLITE is forced to 1, because it serializes writes.
+  # Maximum open connections. SQLITE always runs with 1. Environment: BOT_POOL_MAX_SIZE.
   maxSize: 10
+  # Milliseconds before an idle connection is closed. Environment: BOT_POOL_IDLE_TIMEOUT_MILLIS.
   idleTimeoutMillis: 30000
+  # Milliseconds before a connection is retired. Environment: BOT_POOL_MAX_LIFETIME_MILLIS.
   maxLifetimeMillis: 1800000
+  # Milliseconds to wait for a connection. Environment: BOT_POOL_CONNECTION_TIMEOUT_MILLIS.
   connectionTimeoutMillis: 30000
+  # Milliseconds a borrowed connection may be held before a warning. Environment: BOT_POOL_LEAK_DETECTION_MILLIS.
   leakDetectionMillis: 60000
 
 hibernate:
+  # Log SQL. Environment: BOT_HIBERNATE_SHOW_SQL.
   showSql: false
+  # Indent logged SQL. Environment: BOT_HIBERNATE_FORMAT_SQL.
   formatSql: false
+  # Color logged SQL. Environment: BOT_HIBERNATE_HIGHLIGHT_SQL.
   highlightSql: false
-  # JDBC batch size for inserts and updates.
+  # Rows per JDBC batch. Environment: BOT_HIBERNATE_BATCH_SIZE.
   batchSize: 50
-  # VALIDATE runs migrations then checks the schema. UPDATE is for a throwaway local file.
+  # VALIDATE runs the SQL files, then checks the tables. UPDATE skips the SQL files and lets Hibernate change the database. Environment: BOT_HIBERNATE_SCHEMA.
   schema: VALIDATE
 
 menu:
+  # Folder of JSON preset files. Environment: BOT_MENU_PRESETS_DIRECTORY.
   presetsDirectory: presets
+  # Maximum menu sessions kept in memory. Environment: BOT_MENU_SESSION_MAX_SIZE.
   sessionMaxSize: 50000
-  # Duration: 30m, 90s, 2h, 500ms, or a bare number of minutes.
+  # How long an idle session is kept: 30m, 90s, 2h, 500ms, or a number of minutes. Environment: BOT_MENU_SESSION_IDLE_TTL.
   sessionIdleTtl: 30m
+  # Allow a user preset to override the guild preset. Environment: BOT_MENU_USER_PRESETS_ENABLED.
   userPresetsEnabled: false
+  # Preset id used when nobody has chosen one. Environment: BOT_MENU_DEFAULT_PRESET.
   defaultPreset: default
-  # How many menu handlers may run at once. 0 means no cap.
+  # Menu handlers allowed to run at the same time. 0 does not limit them. Environment: BOT_MENU_MAX_IN_FLIGHT.
   maxInFlight: 0
 
 commands:
-  # GUILD registers on commands.guildId. GLOBAL registers once, from shard 0.
+  # GUILD registers commands on one server. GLOBAL registers them for every server. Environment: BOT_COMMANDS_SCOPE.
   scope: GUILD
-  # Required when scope is GUILD. 0 skips registration and logs why.
+  # Server id used when scope is GUILD. 0 registers nothing and logs that. Environment: BOT_COMMANDS_GUILD_ID.
   guildId: 0
-  # Applied when a command does not set its own. 0s disables cooldowns.
+  # Cooldown used by commands that do not set their own. 0s means no cooldown. Environment: BOT_COMMANDS_DEFAULT_COOLDOWN.
   defaultCooldown: 0s
 
 sentry:
+  # Send errors to Sentry. Environment: BOT_SENTRY_ENABLED.
   enabled: false
-  # Prefer BOT_SENTRY_DSN in the environment.
+  # Sentry DSN. Environment: BOT_SENTRY_DSN.
   dsn: ''

@@ -78,8 +78,8 @@ public class Main extends ListenerAdapter {
         commandRegister = injector.getInstance(CommandRegister.class);
         features = injector.getInstance(FeatureCatalog.class);
 
-        serviceManager.startAll(features.infrastructure());
-        logger.info("Infrastructure services started.");
+        serviceManager.startAll(features.services());
+        logger.info("Services started.");
 
         List<ListenerAdapter> listeners = instantiateListeners(features.listeners());
         commandRegister
@@ -126,8 +126,8 @@ public class Main extends ListenerAdapter {
             event.getJDA().getPresence().setActivity(Activity.playing(config.status()));
         }
 
-        serviceManager.startAll(features.business());
-        logger.info("Business services started.");
+        serviceManager.startAll(features.ready());
+        logger.info("Ready services started.");
 
         Collection<CommandData> commands = commandRegister.getAllCommandsData();
         CommandPublisher.publish(shardManager, event.getJDA(), config, commands);
@@ -167,8 +167,6 @@ public class Main extends ListenerAdapter {
                                     }
                                 });
 
-        // One shard is the default. Setting the total only when asked keeps a normal bot on
-        // JDA's single-shard builder instead of a sharded login it does not need.
         if (config.shards() > 1) {
             builder.setShardsTotal(config.shards());
         }

@@ -28,9 +28,8 @@ import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
  *       because its buttons are bound to whoever ran the command.
  * </ul>
  *
- * <p>To use it, bind the class next to {@code PingCommand} in {@code TemplateBindings}.
- *
- * <p>and follow {@code docs/manual-test.md}, which walks the showcase by hand.
+ * <p>To use it, add {@code slashCommand(ShowcaseCommand.class)} next to {@code PingCommand} in
+ * {@link es.redactado.config.TemplateBindings}, then follow {@code docs/manual-test.md}.
  */
 public class ShowcaseCommand implements BaseSlashCommand {
 

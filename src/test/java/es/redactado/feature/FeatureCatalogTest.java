@@ -29,16 +29,16 @@ class FeatureCatalogTest {
                                 })
                         .getInstance(FeatureCatalog.class);
 
-        assertThat(catalog.infrastructure()).contains(TaskManager.class);
+        assertThat(catalog.services()).contains(TaskManager.class);
         assertThat(catalog.listeners()).contains(CommandListener.class, ExtraListener.class);
-        assertThat(catalog.business()).containsExactly(ExtraService.class);
+        assertThat(catalog.ready()).containsExactly(ExtraService.class);
     }
 
     private static final class ExtraFeature extends BotFeature {
         @Override
         protected void contribute() {
             listener(ExtraListener.class);
-            business(ExtraService.class);
+            ready(ExtraService.class);
         }
     }
 

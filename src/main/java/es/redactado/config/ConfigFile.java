@@ -5,12 +5,10 @@ import de.exlll.configlib.Configuration;
 import java.util.List;
 
 /**
- * The YAML document ConfigLib reads and writes.
+ * The fields of {@code config.yml}.
  *
- * <p>Field names are the keys in {@code config.yml}. Defaults live in the no-argument
- * constructors, which ConfigLib calls when the file does not exist yet. Validation of those
- * values happens later, in {@link BotConfig}, so a broken file fails with the name of the
- * setting rather than with a reflection error.
+ * <p>The no-argument constructors are the values written when the file does not exist yet.
+ * {@link BotConfig} checks those values and turns the text into the types the bot uses.
  */
 @Configuration
 public record ConfigFile(
@@ -35,13 +33,15 @@ public record ConfigFile(
 
     @Configuration
     public record BotFile(
-            @Comment("Bot token. Prefer BOT_TOKEN in the environment when running under Compose.")
-                    String token,
-            @Comment("Gateway intents. Privileged intents are left out of the default.")
+            @Comment("Discord bot token. Environment: BOT_TOKEN.") String token,
+            @Comment(
+                            "Gateway intent names, one per line. Environment: BOT_INTENTS, as a"
+                                    + " comma-separated list.")
                     List<String> intents,
-            @Comment("Presence text. Empty means no presence is set.") String status,
-            @Comment("Reconnect after a gateway drop.") boolean autoReconnect,
-            @Comment("How many gateway shards to open. 1 is enough until Discord asks for more.")
+            @Comment("Status text. Empty shows no status. Environment: BOT_STATUS.") String status,
+            @Comment("Reconnect after the gateway drops. Environment: BOT_AUTO_RECONNECT.")
+                    boolean autoReconnect,
+            @Comment("Gateway shards to open. 1 is a single process. Environment: BOT_SHARDS.")
                     int shards) {
 
         public BotFile() {
@@ -56,13 +56,17 @@ public record ConfigFile(
 
     @Configuration
     public record DatabaseFile(
-            @Comment("SQLITE, MARIADB, or H2.") String type,
-            String host,
-            int port,
-            String name,
-            String user,
-            @Comment("Prefer BOT_DATABASE_PASSWORD in the environment.") String password,
-            @Comment("Directory for SQLITE and H2 files.") String path) {
+            @Comment("SQLITE, MARIADB or H2. Environment: BOT_DATABASE_TYPE.") String type,
+            @Comment("MariaDB hostname. Unused for SQLITE and H2. Environment: BOT_DATABASE_HOST.")
+                    String host,
+            @Comment("MariaDB port. Unused for SQLITE and H2. Environment: BOT_DATABASE_PORT.")
+                    int port,
+            @Comment("Database name. Environment: BOT_DATABASE_NAME.") String name,
+            @Comment("MariaDB user. Unused for SQLITE and H2. Environment: BOT_DATABASE_USER.")
+                    String user,
+            @Comment("MariaDB password. Environment: BOT_DATABASE_PASSWORD.") String password,
+            @Comment("Folder for the SQLITE or H2 file. Environment: BOT_DATABASE_PATH.")
+                    String path) {
 
         public DatabaseFile() {
             this("SQLITE", "localhost", 3306, "redactado", "root", "", "./database");
@@ -71,12 +75,30 @@ public record ConfigFile(
 
     @Configuration
     public record PoolFile(
-            int minIdle,
-            @Comment("SQLITE is forced to 1, because it serializes writes.") int maxSize,
-            long idleTimeoutMillis,
-            long maxLifetimeMillis,
-            long connectionTimeoutMillis,
-            long leakDetectionMillis) {
+            @Comment(
+                            "Connections kept idle. SQLITE always runs with 1. Environment:"
+                                    + " BOT_POOL_MIN_IDLE.")
+                    int minIdle,
+            @Comment(
+                            "Maximum open connections. SQLITE always runs with 1. Environment:"
+                                    + " BOT_POOL_MAX_SIZE.")
+                    int maxSize,
+            @Comment(
+                            "Milliseconds before an idle connection is closed. Environment:"
+                                    + " BOT_POOL_IDLE_TIMEOUT_MILLIS.")
+                    long idleTimeoutMillis,
+            @Comment(
+                            "Milliseconds before a connection is retired. Environment:"
+                                    + " BOT_POOL_MAX_LIFETIME_MILLIS.")
+                    long maxLifetimeMillis,
+            @Comment(
+                            "Milliseconds to wait for a connection. Environment:"
+                                    + " BOT_POOL_CONNECTION_TIMEOUT_MILLIS.")
+                    long connectionTimeoutMillis,
+            @Comment(
+                            "Milliseconds a borrowed connection may be held before a warning."
+                                    + " Environment: BOT_POOL_LEAK_DETECTION_MILLIS.")
+                    long leakDetectionMillis) {
 
         public PoolFile() {
             this(1, 10, 30_000L, 1_800_000L, 30_000L, 60_000L);
@@ -85,13 +107,15 @@ public record ConfigFile(
 
     @Configuration
     public record HibernateFile(
-            boolean showSql,
-            boolean formatSql,
-            boolean highlightSql,
-            @Comment("JDBC batch size for inserts and updates.") int batchSize,
+            @Comment("Log SQL. Environment: BOT_HIBERNATE_SHOW_SQL.") boolean showSql,
+            @Comment("Indent logged SQL. Environment: BOT_HIBERNATE_FORMAT_SQL.") boolean formatSql,
+            @Comment("Color logged SQL. Environment: BOT_HIBERNATE_HIGHLIGHT_SQL.")
+                    boolean highlightSql,
+            @Comment("Rows per JDBC batch. Environment: BOT_HIBERNATE_BATCH_SIZE.") int batchSize,
             @Comment(
-                            "VALIDATE runs migrations then checks the schema. UPDATE is for a"
-                                    + " throwaway local file.")
+                            "VALIDATE runs the SQL files, then checks the tables. UPDATE skips the"
+                                    + " SQL files and lets Hibernate change the database."
+                                    + " Environment: BOT_HIBERNATE_SCHEMA.")
                     String schema) {
 
         public HibernateFile() {
@@ -101,13 +125,28 @@ public record ConfigFile(
 
     @Configuration
     public record MenuFile(
-            String presetsDirectory,
-            long sessionMaxSize,
-            @Comment("Duration: 30m, 90s, 2h, 500ms, or a bare number of minutes.")
+            @Comment("Folder of JSON preset files. Environment: BOT_MENU_PRESETS_DIRECTORY.")
+                    String presetsDirectory,
+            @Comment(
+                            "Maximum menu sessions kept in memory. Environment:"
+                                    + " BOT_MENU_SESSION_MAX_SIZE.")
+                    long sessionMaxSize,
+            @Comment(
+                            "How long an idle session is kept: 30m, 90s, 2h, 500ms, or a number of"
+                                    + " minutes. Environment: BOT_MENU_SESSION_IDLE_TTL.")
                     String sessionIdleTtl,
-            boolean userPresetsEnabled,
-            String defaultPreset,
-            @Comment("How many menu handlers may run at once. 0 means no cap.") int maxInFlight) {
+            @Comment(
+                            "Allow a user preset to override the guild preset. Environment:"
+                                    + " BOT_MENU_USER_PRESETS_ENABLED.")
+                    boolean userPresetsEnabled,
+            @Comment(
+                            "Preset id used when nobody has chosen one. Environment:"
+                                    + " BOT_MENU_DEFAULT_PRESET.")
+                    String defaultPreset,
+            @Comment(
+                            "Menu handlers allowed to run at the same time. 0 does not limit them."
+                                    + " Environment: BOT_MENU_MAX_IN_FLIGHT.")
+                    int maxInFlight) {
 
         public MenuFile() {
             this("presets", 50_000L, "30m", false, "default", 0);
@@ -116,11 +155,17 @@ public record ConfigFile(
 
     @Configuration
     public record CommandsFile(
-            @Comment("GUILD registers on commands.guildId. GLOBAL registers once, from shard 0.")
+            @Comment(
+                            "GUILD registers commands on one server. GLOBAL registers them for"
+                                    + " every server. Environment: BOT_COMMANDS_SCOPE.")
                     String scope,
-            @Comment("Required when scope is GUILD. 0 skips registration and logs why.")
+            @Comment(
+                            "Server id used when scope is GUILD. 0 registers nothing and logs that."
+                                    + " Environment: BOT_COMMANDS_GUILD_ID.")
                     long guildId,
-            @Comment("Applied when a command does not set its own. 0s disables cooldowns.")
+            @Comment(
+                            "Cooldown used by commands that do not set their own. 0s means no"
+                                    + " cooldown. Environment: BOT_COMMANDS_DEFAULT_COOLDOWN.")
                     String defaultCooldown) {
 
         public CommandsFile() {
@@ -130,7 +175,8 @@ public record ConfigFile(
 
     @Configuration
     public record SentryFile(
-            boolean enabled, @Comment("Prefer BOT_SENTRY_DSN in the environment.") String dsn) {
+            @Comment("Send errors to Sentry. Environment: BOT_SENTRY_ENABLED.") boolean enabled,
+            @Comment("Sentry DSN. Environment: BOT_SENTRY_DSN.") String dsn) {
 
         public SentryFile() {
             this(false, "");

@@ -11,27 +11,17 @@ import es.redactado.service.IService;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 /**
- * One piece of a bot: the commands, listeners, services, tables and SQL it owns.
+ * Registers one part of the bot.
  *
- * <p>Extend this, implement {@link #contribute()}, and list the class in {@code
- * META-INF/services/es.redactado.feature.BotFeature}. {@link
- * es.redactado.config.TemplateBindings} is the piece this repository already ships, and {@code
- * BotModule} installs it directly, so it is not in that file. A jar on the classpath is picked
- * up the same way, which is how a bot grows without editing the template's lists.
+ * <p>The bot's own registrations live in {@link es.redactado.config.TemplateBindings}. Add a line
+ * there. A class in another jar extends this type and is named, one class per line, in {@code
+ * META-INF/services/es.redactado.feature.BotFeature}.
  *
- * <p>Settings that belong only to this feature go in their own YAML record through {@link
- * es.redactado.config.ConfigFiles#load}. {@code config.yml} stays the process settings.
- *
- * <p>{@link #configure()} is final because every feature has to open the same empty Guice sets
- * first. A bot that registers nothing must still be able to inject those sets.
+ * <p>Call the methods below from {@link #contribute()}. They record classes. They do not start
+ * anything. {@code Main} starts services and registers listeners after the injector exists.
  */
 public abstract class BotFeature extends AbstractModule {
 
-    /**
-     * Opens an empty set for each kind of contribution, then lets the subclass fill the ones it
-     * uses. Guice refuses to inject a set that no module created, so the empty sets are part of
-     * the contract, not a leftover.
-     */
     @Override
     protected final void configure() {
         Multibinder.newSetBinder(binder(), InfrastructureService.class);
@@ -45,38 +35,32 @@ public abstract class BotFeature extends AbstractModule {
         contribute();
     }
 
-    /**
-     * Name what this feature adds. Called once, while Guice is being built, so the methods below
-     * are registrations rather than work that should run at startup.
-     */
+    /** Add this feature's commands, listeners, services, entities and migrations. */
     protected abstract void contribute();
 
-    /** A slash command. {@code CommandRegister} indexes it by the name Discord sends back. */
+    /** Slash command, indexed by the name in its command data. */
     protected final void slashCommand(Class<? extends BaseSlashCommand> type) {
         Multibinder.newSetBinder(binder(), BaseSlashCommand.class).addBinding().to(type);
     }
 
-    /** A command that acts on a message. The reply is ephemeral. */
+    /** Command shown when someone right-clicks a message. */
     protected final void messageCommand(Class<? extends BaseMessageContextCommand> type) {
         Multibinder.newSetBinder(binder(), BaseMessageContextCommand.class).addBinding().to(type);
     }
 
-    /** A command that acts on a user. The reply is ephemeral. */
+    /** Command shown when someone right-clicks a user. */
     protected final void userCommand(Class<? extends BaseUserContextCommand> type) {
         Multibinder.newSetBinder(binder(), BaseUserContextCommand.class).addBinding().to(type);
     }
 
-    /** A Hibernate class. {@code DatabaseManager} maps every entity any feature registered. */
+    /** Hibernate class. Included in the session factory. */
     protected final void entity(Class<?> type) {
         Multibinder.newSetBinder(binder(), ManagedEntity.class)
                 .addBinding()
                 .toInstance(new ManagedEntity(type));
     }
 
-    /**
-     * A gateway listener that is not a command. Command classes that also listen, for
-     * autocomplete, are registered by {@code CommandRegister} and do not need this.
-     */
+    /** Gateway listener. {@code Main} registers it on the shard manager. */
     protected final void listener(Class<? extends ListenerAdapter> type) {
         Multibinder.newSetBinder(binder(), ListenerBinding.class)
                 .addBinding()
@@ -84,32 +68,32 @@ public abstract class BotFeature extends AbstractModule {
     }
 
     /**
-     * A service started before the gateway connects. It can use the database and the thread
-     * pools. It cannot use {@code ShardManager}, which is created from the injector that is
-     * still starting these services.
+     * Service started before the bot connects. Use this for the database, caches and anything
+     * else that does not call Discord yet.
      */
-    protected final void infrastructure(Class<? extends IService> type) {
+    protected final void service(Class<? extends IService> type) {
         Multibinder.newSetBinder(binder(), InfrastructureService.class)
                 .addBinding()
                 .toInstance(new InfrastructureService(type));
     }
 
     /**
-     * A service started after the first ready event, once guilds and the Discord API are
-     * available. Declare {@code dependsOn()} if it needs an infrastructure service to have
-     * started first; {@code ServiceManager} honours that, not the order of these calls.
+     * Service started once Discord has sent ready. Use this when the service looks up guilds or
+     * sends messages during {@code init}.
      */
-    protected final void business(Class<? extends IService> type) {
+    protected final void ready(Class<? extends IService> type) {
         Multibinder.newSetBinder(binder(), BusinessService.class)
                 .addBinding()
                 .toInstance(new BusinessService(type));
     }
 
     /**
-     * A SQL script for one dialect ({@code sqlite}, {@code mariadb} or {@code h2}).
+     * SQL file for one database kind: {@code sqlite}, {@code h2} or {@code mariadb}.
      *
-     * <p>The version must be unique for that dialect across every feature. The resource is a
-     * classpath path such as {@code /db/migration/sqlite/V2__notes.sql}.
+     * <p>{@code version} is the number in the file name ({@code V2__notes.sql} is version 2). Each
+     * number is used once per database kind. The template's scripts are version 1.
+     *
+     * @param resource classpath path, for example {@code /db/migration/sqlite/V2__notes.sql}
      */
     protected final void migration(String dialect, int version, String resource) {
         Multibinder.newSetBinder(binder(), MigrationScript.class)

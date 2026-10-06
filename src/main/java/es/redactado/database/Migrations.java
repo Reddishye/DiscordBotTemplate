@@ -18,14 +18,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Applies versioned SQL scripts before Hibernate validates the schema.
+ * Runs the SQL files for the configured database before Hibernate checks the tables.
  *
- * <p>Flyway Community does not publish a SQLite module, and this template's local database is
- * SQLite, so the runner is a few dozen lines instead of a dependency that cannot open the file
- * the bot actually uses. Scripts live under {@code db/migration/<dialect>/} and are listed, in
- * order, in {@code manifest.txt}. Each script runs once. The applied version is stored in
- * {@code schema_migration}. A feature's {@link MigrationScript}s are merged into that list for
- * the dialect in use. Two scripts that share a version for that dialect abort startup.
+ * <p>Files are listed in {@code db/migration/<dialect>/manifest.txt}. A {@link MigrationScript}
+ * is added to that list. Each version runs once and is stored in {@code schema_migration}. The
+ * same version twice, for the same dialect, stops startup. {@code hibernate.schema: UPDATE}
+ * skips this and lets Hibernate change the database.
  */
 public final class Migrations {
 

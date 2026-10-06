@@ -12,8 +12,8 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import es.redactado.config.BotConfig;
 import es.redactado.config.ConfigFile;
-import es.redactado.config.Services;
 import es.redactado.config.TemplateBindings;
+import es.redactado.feature.FeatureCatalog;
 import es.redactado.menu.api.MenuContext;
 import es.redactado.menu.core.MenuRouter;
 import java.util.concurrent.CompletableFuture;
@@ -153,7 +153,7 @@ class MenuServiceTest {
             Injector injector = injector();
             ServiceManager registry = injector.getInstance(ServiceManager.class);
 
-            registry.startAll(Services.INFRASTRUCTURE_SERVICES);
+            registry.startAll(injector.getInstance(FeatureCatalog.class).services());
             MenuService menus = injector.getInstance(MenuService.class);
 
             // The proof, not a tautology: init() borrows taskManager.ioExecutor(), so a

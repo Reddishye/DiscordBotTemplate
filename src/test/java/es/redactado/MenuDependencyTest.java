@@ -51,15 +51,15 @@ class MenuDependencyTest {
                     "feature/BotFeature.java",
                     "feature/FeatureCatalog.java",
                     "feature/InfrastructureService.java",
-                    "feature/BusinessService.java");
+                    "feature/BusinessService.java",
+                    "config/TemplateBindings.java");
 
     /**
      * Template files that already imported the services before the menu system existed.
      *
-     * <p>{@code Main} starts the services and {@code Services} lists them. Neither is menu
-     * code, and neither was touched by this work.
+     * <p>{@code Main} starts the services. It is not menu code.
      */
-    private static final List<String> PRE_EXISTING = List.of("Main.java", "config/Services.java");
+    private static final List<String> PRE_EXISTING = List.of("Main.java");
 
     @Test
     @DisplayName("outside the menu package, only integration code imports es.redactado.service")

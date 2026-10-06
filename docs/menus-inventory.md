@@ -28,8 +28,8 @@ The menu framework therefore lives under `es.redactado.menu`.
 | --- | --- |
 | Build tool | Gradle 9.8.0 (Kotlin DSL, `build.gradle.kts`) |
 | Java version | **27**, pinned by `java { toolchain { languageVersion = JavaLanguageVersion.of(27) } }`. Nothing in the menu package uses a feature newer than 21; the baseline moved because the project needs 27 |
-| Formatter | Spotless 7.2.1, google-java-format 1.26.0, AOSP style, `reflowLongStrings`, `skipJavadocFormatting`, `formatAnnotations`, `removeUnusedImports` |
-| Packaging | Shadow 9.2.2 (`shadowJar`), Sentry 5.12.1, `application` plugin with main class `es.redactado.Main` |
+| Formatter | Spotless 8.9.0, google-java-format 1.26.0, AOSP style, `reflowLongStrings`, `skipJavadocFormatting`, `formatAnnotations`, `removeUnusedImports` |
+| Packaging | Shadow 9.6.1 (`shadowJar`), Sentry Gradle plugin 6.18.0, `application` plugin with main class `es.redactado.Main` |
 
 A formatter is already configured, so Spotless stays as-is. Java 27 is the
 baseline; the features the menu package actually uses, records, sealed
@@ -40,14 +40,13 @@ hierarchies, pattern-matching `switch` and virtual threads, all arrived by 21.
 Present in `build.gradle.kts`:
 
 - JDA `6.5.0` (`opus-java` excluded)
-- discord-webhooks `0.8.4`
 - Guice `7.0.0`
-- dotenv-java `3.2.0`
-- logback-classic `1.5.18`, slf4j-api `2.0.17`, jansi `2.4.2`
-- tess4j `5.16.0`
-- Hibernate ORM `7.1.5.Final` (core, hikaricp, jcache, community-dialects)
+- ConfigLib YAML `4.8.1` (`config.yml`)
+- Caffeine `3.2.2` and `jcache`
+- logback-classic `1.6.1`, slf4j-api `2.0.17`, jansi `2.4.2`
+- Hibernate ORM `7.4.5.Final` (core, hikaricp, jcache, community-dialects)
 - jakarta.transaction-api
-- HikariCP `7.0.2`, MariaDB `3.5.7`, SQLite `3.50.3.0`, H2 `2.3.232`
+- HikariCP `7.0.2`, MariaDB `3.5.7`, SQLite `3.50.3.0`, H2 `2.4.240`
 - jackson-databind `2.19.1`
 
 Test-only: JUnit Jupiter `5.11.4`, Mockito `5.14.2`, AssertJ `3.26.3`,
@@ -56,36 +55,29 @@ dedicated `mockitoAgent` configuration used as a `-javaagent`.
 
 Findings that affect the port:
 
-- **Caffeine was undeclared in the working tree.** The working tree removed
-  `com.github.ben-manes.caffeine:caffeine:v3.2.2` and `caffeine:jcache:v3.2.2`
-  from `build.gradle.kts`, yet `src/main/java/es/redactado/command/handler/CommandRegister.java`
-  still imports `com.github.benmanes.caffeine.cache.Cache` and
-  `com.github.benmanes.caffeine.cache.Caffeine`. `./gradlew compileJava`
-  therefore failed with 8 errors before any menu work began. Both lines were
-  already in `HEAD`, so the file was restored to its committed content. The menu
-  runtime also needs Caffeine for sessions, cooldown, and async loading, which
-  section 2.3 permits.
+- **Caffeine is a direct dependency.** The session store, cooldown cache and
+  Hibernate second-level cache use it. Section 2.3 describes the session store.
 - **Test infrastructure was added.** There was no `src/test` tree, no test
   dependency, and no `useJUnitPlatform()`. See section 1.8.
 - **Serialization.** Jackson Databind `2.19.1` is resolved in `runtimeClasspath`
   through JDA's own dependency, but it is *not* on `compileClasspath`, so menu
   code cannot compile against it without a declaration. It is declared explicitly
   at the already-resolved version rather than introducing a new library. Preset
-  files are JSON only; no YAML module is added.
+  files are JSON. Bot settings are YAML through ConfigLib, which the menu
+  package does not import.
 
 ### 1.4 Dependency injection
 
 Guice 7.0.0, constructor injection with `@Inject`, `@Singleton` from Guice, and
 a single `BotModule extends AbstractModule` created in `Main.run()`.
 
-`BotModule.configure()` currently binds `Main`, `ShardManager`, an eager
-`DatabaseManager` singleton, and every class listed in `Database.REPOSITORIES`.
-It also exposes `@Provides @Singleton Dotenv`.
+`BotModule.configure()` binds `Main`, `ShardManager`, an eager `DatabaseManager`,
+and installs `TemplateBindings`.
 
-The menu framework follows the same pattern and adds two bindings:
-`MenuService`, a Guice `@Singleton` owning the router, and `MenuListener`, which
-`Listeners.LISTENERS` asks the injector for. `TaskManager` is a `@Singleton` as
-well, because a second one would own a second set of pools.
+`MenuService` owns the router. `MenuListener` is registered from
+`TemplateBindings`, and so is `TaskManager`. Both services are `@Singleton`:
+`ServiceManager` calls `init` on the instance Guice returns, and a second
+`TaskManager` would own pools that were never started.
 
 ### 1.4b Where the menu package gets its executors
 
@@ -126,9 +118,9 @@ before asserting, because `estimatedSize()` is approximate and eviction is lazy.
 
 ### 1.5 Event listeners
 
-Listeners are discovered from the static list `es.redactado.config.Listeners.LISTENERS`.
-`Main.instantiateListeners()` asks the injector for each entry and registers the
-result with `ShardManager.addEventListener`. Slash commands that also extend
+Listeners are the classes registered with `listener(...)` in `TemplateBindings`.
+`Main` asks the injector for each one and registers it with
+`ShardManager.addEventListener`. Slash commands that also extend
 `ListenerAdapter` are appended from `CommandRegister.getListeners()`.
 
 The command entry is `CommandListener`, which shows the template's
@@ -137,8 +129,8 @@ interaction convention: take the event on the JDA thread, hand the work to
 route failures to a single ephemeral error reply plus `Sentry.captureException`.
 
 The menu listener is registered the same way and already is:
-`MenuListener extends ListenerAdapter` in this same package, listed in
-`Listeners.LISTENERS`, delegating to the router the `MenuService` owns. See the
+`MenuListener extends ListenerAdapter` in this same package, registered in
+`TemplateBindings`, delegating to the router the `MenuService` owns. See the
 Wiring section.
 
 ### 1.6 Lifecycle and shutdown
@@ -149,16 +141,15 @@ Wiring section.
 
 Service lifecycle is handled by `IService` (`init()` / `shutdown()` /
 `dependsOn()`), orchestrated by `ServiceManager.startAll(List<Class<? extends IService>>)`
-and `ServiceManager.stopAll()`. Services are declared in
-`es.redactado.config.Services` as two lists:
+and `ServiceManager.stopAll()`. Services are registered in `TemplateBindings`:
 
-- `INFRASTRUCTURE_SERVICES`, started before JDA connects
-- `BUSINESS_SERVICES`, started after the first `ReadyEvent`
+- `service(...)`, started before JDA connects
+- `ready(...)`, started after the first `ReadyEvent`
 
 The menu runtime needs to close its executor, its session store and its preset
 watcher, and it needs to be reachable from a command. It is therefore
-`es.redactado.service.MenuService`, an `IService` registered in
-`INFRASTRUCTURE_SERVICES` after `TaskManager`: it starts before JDA connects,
+`es.redactado.service.MenuService`, registered with `service(...)` beside
+`TaskManager`: it starts before JDA connects,
 builds the `MenuRouter` with the executors `TaskManager` owns, schedules the
 session store's drain, and closes in `shutdown()`. `Main.shutdown()` already
 delegates to `ServiceManager.stopAll()`, so the existing shutdown hook closes it in
@@ -197,8 +188,8 @@ any of it: it takes an `Executor` and knows nothing about the bot.
 
 | Service | Declared in | Depends on | What it owns |
 | --- | --- | --- | --- |
-| `TaskManager` | `Services.INFRASTRUCTURE_SERVICES` | nothing | the pools |
-| `MenuService` | `Services.INFRASTRUCTURE_SERVICES`, after `TaskManager` | `TaskManager` | router, sessions, presets, preferences, the preset watcher, the drain schedule |
+| `TaskManager` | `TemplateBindings`, `service(...)` | nothing | the pools |
+| `MenuService` | `TemplateBindings`, `service(...)` | `TaskManager` | router, sessions, presets, preferences, the preset watcher, the drain schedule |
 
 Both are started before JDA connects, so neither may touch `ShardManager`, and neither
 does.
@@ -212,10 +203,8 @@ injector the way the template does and reaching for a pool through the service.
 
 ### Listener
 
-`MenuListener` lives in `es.redactado.command.handler`, beside `CommandListener`,
-because that is where the template keeps its `ListenerAdapter` implementations and
-where `Listeners.LISTENERS` expects them from. It is registered in
-`Listeners.LISTENERS` and injects `MenuService`.
+`MenuListener` lives in `es.redactado.command.handler`, next to `CommandListener`.
+`TemplateBindings` registers it. It injects `MenuService`.
 
 It is three overrides and nothing else: `onButtonInteraction`, `onModalInteraction`
 and `onStringSelectInteraction`, each delegating to the matching
@@ -232,24 +221,23 @@ system does not own is left untouched for another listener.
 
 `MenuDependencyTest` enforces the boundary: nothing under `menu` imports
 `es.redactado.*` at all, and outside it the only importers of `es.redactado.service`
-are `MenuListener` plus the two template files that already did so.
+are the files named in that test.
 
 ### Configuration
 
-Read through `Dotenv`, the mechanism the template already uses, so there is one way
-to configure a bot rather than two.
+Menu settings are the `menu` section of `config.yml`. The environment name is in
+the comment on each line.
 
-| Setting | Default | Meaning |
+| Field | Default | What it sets |
 | --- | --- | --- |
-| `MENU_PRESETS_DIR` | `presets` | directory read for `*.json` preset files; a missing directory is not an error |
-| `MENU_SESSION_MAX_SIZE` | `50000` | how many menu messages are remembered at once |
-| `MENU_SESSION_IDLE_TTL` | `30m` | how long an untouched message keeps its history; accepts `ms`, `s`, `m`, `h`, or a bare number of minutes |
-| `MENU_USER_PRESETS_ENABLED` | `false` | whether a user's own choice may override their guild's |
-| `MENU_DEFAULT_PRESET` | `default` | which preset is used when nothing else says otherwise |
+| `presetsDirectory` | `presets` | folder of `*.json` preset files; a missing folder is not an error |
+| `sessionMaxSize` | `50000` | how many menu messages are remembered at once |
+| `sessionIdleTtl` | `30m` | how long an untouched message keeps its history; `ms`, `s`, `m`, `h`, or a number of minutes |
+| `userPresetsEnabled` | `false` | whether a user's choice replaces the guild's |
+| `defaultPreset` | `default` | preset used when nobody has chosen one |
+| `maxInFlight` | `0` | handlers allowed at once; `0` does not limit them |
 
-A value that is present but unusable fails at startup with a message naming the
-setting, because a mistyped number in a `.env` file is otherwise invisible until a
-menu misbehaves hours later.
+A value that cannot be read stops startup and names the setting.
 
 ### Shutdown order
 

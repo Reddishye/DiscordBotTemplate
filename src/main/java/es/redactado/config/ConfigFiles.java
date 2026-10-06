@@ -4,12 +4,10 @@ import de.exlll.configlib.YamlConfigurations;
 import java.nio.file.Path;
 
 /**
- * Where a feature keeps settings that do not belong in {@code config.yml}.
+ * Loads a YAML file from the same directory as {@code config.yml}.
  *
- * <p>{@link #load} writes a record to its own file beside the core config, using ConfigLib's
- * defaults and comments, and reads it back on the next start. A feature in another jar can do
- * this without adding fields to {@link ConfigFile}. Environment overrides for that file are the
- * feature's own concern; the core overlay only covers {@code config.yml}.
+ * <p>Use this when a class in another jar needs its own file. Settings for this bot go in {@link
+ * ConfigFile} instead.
  */
 public final class ConfigFiles {
 

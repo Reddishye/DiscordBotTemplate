@@ -12,8 +12,9 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
 /**
- * Base class for all domain entities. This class contains common fields such as id, createdAt, and
- * updatedAt.
+ * Shared columns: {@code id}, {@code createdAt}, {@code updatedAt} and {@code version}.
+ *
+ * <p>{@code version} increments on each update. A write that still has the old number fails.
  */
 @MappedSuperclass
 public abstract class BaseDomain {
@@ -26,7 +27,6 @@ public abstract class BaseDomain {
 
     @UpdateTimestamp private Instant updatedAt;
 
-    /** Optimistic lock. Two interactions cannot silently overwrite the same row. */
     @Version private long version;
 
     // Getters and setters

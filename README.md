@@ -6,6 +6,8 @@ database layer, and a menu framework for everything a user interacts with.
 ## Table of contents
 
 1. [Overview](#overview)
+   - [Configuration](#configuration)
+   - [Your code](#your-code)
 2. [Architecture of the template](#architecture-of-the-template)
 3. [Menus: how an interaction flows](#menus-how-an-interaction-flows)
 4. [Building menus](#building-menus)
@@ -47,13 +49,13 @@ src/main/java/es/redactado/
                             listeners, shutdown hook
   BotModule.java            Guice bindings
   command/                  slash, message and user commands, and their dispatch
-  config/                   config.yml, env overrides, and the template's own feature
-  database/                 sessions, migrations, model, repository
-  feature/                  how a bot adds commands, listeners, services and SQL
+  config/                   config.yml loading, and TemplateBindings
+  database/                 DatabaseManager, migrations, entities
+  feature/                  BotFeature, the methods TemplateBindings calls
   service/                  IService, ServiceManager, TaskManager, MenuService
   menu/                     the menu framework, see "Menus" below
+config.example.yml          every config.yml field, with its environment variable
 src/main/resources/
-  config.example.yml       configuration sample
   logback.xml               logging
   menu/messages.properties  English strings
   menu/messages_es.properties  Spanish strings
@@ -67,26 +69,70 @@ docs/
 
 ### Configuration
 
-Settings live in `config.yml`, written on first start from the defaults in
-`config.example.yml`. The token can sit in that file. Every field can also be set
-from the environment, which is what a Compose file should use: `BOT_TOKEN` overrides
-`bot.token`, `BOT_DATABASE_HOST` overrides `database.host`, and so on, following the
-path. A blank variable does not override. The merged result is never written back
-into the file.
+The first start writes `config.yml`. `config.example.yml` is that file with a
+comment on every value. Edit `config.yml`. Each comment names the environment
+variable that overrides that one value, for example `BOT_TOKEN` and
+`BOT_DATABASE_HOST`. A blank variable leaves the file value. The file is not
+rewritten.
 
-`CONFIG_FILE` chooses a path other than `config.yml`. The older `DISCORD_TOKEN` and
-`DB_*` names still apply when the matching `BOT_*` name is unset. `bot.shards`
-(or `BOT_SHARDS`) is the gateway shard count; `1` leaves JDA on a single shard.
+`CONFIG_FILE` is the path when the file is not named `config.yml`.
 
-A feature that needs its own settings uses `ConfigFiles.load` with a record. That
-writes a separate YAML file beside `config.yml`, so the core file does not grow a
-field for every bot.
+A bad value stops startup and names the setting. `database.type: SQLITE` stores a
+file under `database.path` and uses one connection. `commands.scope: GUILD` with
+`commands.guildId: 0` registers no commands until you set a server id.
+`hibernate.schema: VALIDATE` runs the SQL files and then checks the tables.
+`UPDATE` skips the SQL files.
 
-A value that is present but unusable fails startup and names the setting. SQLite is
-the local default and is given a connection pool of one. `commands.scope` is `GUILD`
-or `GLOBAL`. A guild id of `0` skips registration until you set one.
-`hibernate.schema` is `VALIDATE` (run the SQL migrations, then check) or `UPDATE`
-(Hibernate may alter a throwaway local file).
+To add a setting:
+
+1. Add the field to the record in `ConfigFile`, and a default in that record's
+   no-arg constructor. Name the environment variable in the `@Comment`.
+2. Add the same field to `BotConfig` and set it in `BotConfig.from`. The rest
+   of the bot reads `BotConfig`, not the YAML record.
+
+The environment name is the YAML path: `database.host` is `BOT_DATABASE_HOST`.
+Under `bot`, the path already starts with `bot`, so `bot.token` is `BOT_TOKEN`.
+
+A class in another jar that cannot edit `ConfigFile` loads its own file with
+`ConfigFiles.load("welcome.yml", WelcomeSettings.class)` from the same directory.
+
+### Your code
+
+`TemplateBindings` is the list of what this bot runs. `PingCommand` is the
+example. Add a line next to it:
+
+| You are adding | Line |
+| --- | --- |
+| Slash command | `slashCommand(MyCommand.class)` |
+| Message command | `messageCommand(MyCommand.class)` |
+| User command | `userCommand(MyCommand.class)` |
+| Gateway listener | `listener(MyListener.class)` |
+| Service, started before Discord connects | `service(MyService.class)` |
+| Service, started when the bot is ready | `ready(MyService.class)` |
+| Hibernate class | `entity(MyEntity.class)` |
+| SQL file | `migration("sqlite", 2, "/db/migration/sqlite/V2__notes.sql")` |
+
+A command class implements `BaseSlashCommand`, `BaseMessageContextCommand` or
+`BaseUserContextCommand`. `PingCommand` is a slash command. `CommandListener`
+acknowledges the interaction, runs the handler off the gateway thread, and sends
+one ephemeral reply when the handler fails.
+
+A service implements `IService`: `init`, `shutdown`, and `dependsOn`.
+`service(...)` runs before the bot connects, so it cannot call Discord yet.
+`ready(...)` runs after Discord sends ready. `dependsOn()` names services that
+must already be started. `TaskManager`, `DatabaseManager` and `MenuService` are
+registered this way in `TemplateBindings`.
+
+`TaskManager` and `MenuService` are `@Singleton`. `ServiceManager` asks Guice for
+the class and calls `init` on whatever it gets back. A second `TaskManager` would
+have pools that were never started.
+
+An SQL migration is one file per database you use (`sqlite`, `h2`, `mariadb`).
+Version 1 is the template's file. Use 2 or higher. The same version twice for the
+same database stops startup.
+
+A class in another jar extends `BotFeature`, calls the same methods, and is
+listed in `META-INF/services/es.redactado.feature.BotFeature`.
 
 ### Running
 
@@ -95,8 +141,8 @@ or `GLOBAL`. A guild id of `0` skips registration until you set one.
 ```
 
 `Main.run()` redirects standard output into the logger, loads `config.yml`, builds the
-shard manager, builds the Guice injector, starts the infrastructure services,
-registers the listeners, and installs a shutdown hook.
+shard manager, builds the Guice injector, starts the services, registers the
+listeners, and installs a shutdown hook.
 
 ### Running the tests
 
@@ -113,32 +159,6 @@ Two kinds of test are left out of that command on purpose:
 
 ## Architecture of the template
 
-### Services and their start order
-
-Services implement `IService` (`init`, `shutdown`, `dependsOn`). The template's
-own services stay in `config/Services.java`. A feature appends more with
-`BotFeature.infrastructure` and `BotFeature.business`; `FeatureCatalog` merges both
-and drops duplicates.
-
-| List | When | What may use it |
-| --- | --- | --- |
-| `INFRASTRUCTURE_SERVICES` | before JDA connects | database, caches, config, executors. Must not touch `ShardManager`. |
-| `BUSINESS_SERVICES` | after the first `ReadyEvent` | anything needing guild data or the Discord API |
-
-`ServiceManager.startAll` starts a list in dependency order and
-`stopAll` stops it in reverse, so `Main.shutdown()` needs to know nothing about
-what is inside it.
-
-| Service | List | Depends on | Owns |
-| --- | --- | --- | --- |
-| `TaskManager` | infrastructure | nothing | the thread pools |
-| `MenuService` | infrastructure | `TaskManager` | the router, the session store, the preset registry and watcher, the drain schedule |
-
-Both are Guice `@Singleton`. That is load-bearing rather than tidy: `ServiceManager`
-resolves each service class with `injector.getInstance`, so without a scope a class
-injecting `TaskManager` would get a second, never-started copy whose executors do
-not exist.
-
 ### TaskManager and its pools
 
 `TaskManager` owns three pools, sized by its constructor:
@@ -154,64 +174,11 @@ not exist.
 `IllegalStateException` before `init()`, which is the same contract as the rest of
 the manager: an accessor has no future to fail, so it fails at the call.
 
-### Adding a feature
-
-The template is a starting process, not a finished bot. Ping, the menu listener
-and the two tables it ships are examples of the same mechanism you use for
-everything else. You do not edit `Listeners`, `Services` or `TemplateBindings`
-to grow the bot. You write a feature.
-
-A feature is a class that extends `BotFeature` and, in `contribute()`, names
-what it brings:
-
-- `slashCommand`, `messageCommand` and `userCommand` for the three command
-  kinds Discord has. `CommandRegister` indexes them by name, and
-  `CommandListener` acknowledges the interaction, runs the handler off the
-  gateway thread, and turns a failure into one ephemeral reply.
-- `listener` for a `ListenerAdapter` that is not a command. The template always
-  registers `CommandListener` and `MenuListener`; yours are added beside them.
-- `infrastructure` for a service that must exist before the gateway connects
-  (a cache, a client, a repository). It must not touch `ShardManager`, because
-  the shard manager does not exist yet.
-- `business` for a service that needs guilds or the Discord API. It starts
-  after the first ready event.
-- `entity` for a Hibernate class. `DatabaseManager` maps every entity any
-  feature registered.
-- `migration` for a SQL script. Give it the dialect (`sqlite`, `h2` or
-  `mariadb`), a version number and a classpath resource. Ship a script for
-  each dialect you actually run. Version 1 belongs to the template, so start
-  at 2. Two scripts that claim the same version for the same dialect stop
-  startup, which is better than silently applying them in an arbitrary order.
-
-`TemplateBindings` is the feature this repository already installs. Yours is
-discovered on its own: put the class name, one per line, in
-`META-INF/services/es.redactado.feature.BotFeature`. A separate jar on the
-classpath is enough. The template does not have a list of features to update.
-
-`FeatureCatalog` then builds the three lists `Main` actually starts: the
-template's services and listeners first, then whatever features added. A class
-that shows up twice is started once. `ServiceManager` still honours
-`dependsOn()`, so declaring a service does not decide its order.
-
-Settings that belong to one feature stay out of `config.yml`. Inject
-`ConfigFiles` and call `load` with a record. ConfigLib writes that record to
-its own YAML file in the same directory as `config.yml`, with the record's
-defaults and comments, and reads it back on the next start. The core file is
-only the process: token, database, pool, commands, menu, sentry, shards.
-
-`bot.shards` (or `BOT_SHARDS`) is how many gateway shards to open. Leave it at
-1 until Discord tells you the bot needs more. The template does not ask
-Discord for a recommended count.
-
 ### The database layer
 
-`DatabaseManager` builds a Hibernate `SessionFactory` from the database section of
-`config.yml`, using `hibernate-hikaricp` for pooling and `hibernate-jcache` with
-Caffeine as the second-level cache. Entities are `ManagedEntity` bindings from a
-`BotFeature` (`TemplateBindings` registers the ones this template ships). SQL for
-`sqlite`, `h2` and `mariadb` lives under `db/migration`, and a feature adds a
-script with `BotFeature.migration`. Two scripts for the same dialect and version
-fail startup.
+`DatabaseManager` opens Hibernate from the `database` section of `config.yml`.
+`entity(...)` in `TemplateBindings` adds a class to that session factory. SQL
+files live under `db/migration` and are registered with `migration(...)`.
 
 A use case calls `DatabaseManager.inTransaction` or `inTransactionAsync`. The async
 form runs on `TaskManager`'s I/O executor, which keeps JDBC off a JDA thread. The
@@ -221,11 +188,9 @@ call to `inTransaction` instead.
 
 ### How DI scopes services
 
-`BotModule` binds `Main`, `ShardManager`, `ServiceManager`, `CommandRegister`, an
-`DatabaseManager`, every feature module, the `MenuService` and the
-`MenuListener`, and binds the loaded `BotConfig`. Everything is constructor
-injection; the only field injection in the project is in tests, where Mockito
-builds the object.
+`BotModule` binds `Main`, `ShardManager`, `BotConfig` and `DatabaseManager`, and
+installs `TemplateBindings` plus any `BotFeature` listed in
+`META-INF/services/es.redactado.feature.BotFeature`. Injection is by constructor.
 
 ## Menus: how an interaction flows
 

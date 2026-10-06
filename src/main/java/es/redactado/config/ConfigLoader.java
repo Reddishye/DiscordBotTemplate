@@ -5,11 +5,8 @@ import java.nio.file.Path;
 import java.util.Map;
 
 /**
- * Loads {@code config.yml}, then applies the environment.
- *
- * <p>{@code CONFIG_FILE} chooses the path because the file cannot name itself. {@link
- * YamlConfigurations#update} creates the file from the record defaults when it is missing and
- * adds keys when the record grows. The environment is applied after that, in memory only.
+ * Reads {@code config.yml}, creates it from {@link ConfigFile} when it is missing, then applies
+ * environment variables. {@code CONFIG_FILE} selects a different path.
  */
 public final class ConfigLoader {
 

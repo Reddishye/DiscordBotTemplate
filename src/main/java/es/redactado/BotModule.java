@@ -10,12 +10,10 @@ import java.util.ServiceLoader;
 import net.dv8tion.jda.api.sharding.ShardManager;
 
 /**
- * Binds the process objects and installs every feature.
+ * Binds the process and installs features.
  *
- * <p>{@link es.redactado.config.TemplateBindings} is installed by name because it is this
- * repository. Every other {@link BotFeature} comes from {@link ServiceLoader}, which reads
- * {@code META-INF/services/es.redactado.feature.BotFeature}. A file that only contains comments
- * contributes nothing, and that is the state of a fresh checkout.
+ * <p>{@link es.redactado.config.TemplateBindings} is this repository. Further {@link BotFeature}
+ * classes are read from {@code META-INF/services/es.redactado.feature.BotFeature}.
  */
 public class BotModule extends AbstractModule {
     private final Main main;
