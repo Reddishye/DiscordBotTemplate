@@ -3,8 +3,6 @@
 A Discord bot built on JDA 6 with Guice for dependency injection, a Hibernate
 database layer, and a menu framework for everything a user interacts with.
 
-Commands, services, tables and settings are in [`docs/bot.md`](docs/bot.md).
-
 ## Table of contents
 
 1. [Overview](#overview)
@@ -64,7 +62,6 @@ src/main/resources/
 src/test/java/es/redactado/
   menu/                     the menu tests, including the scan tests
 docs/
-  bot.md                    commands, services, the database, settings
   menus-inventory.md        the menu API and the architecture, in full
   manual-test.md            what to check by hand, with a real bot
 ```
@@ -82,8 +79,8 @@ rewritten.
 A bad value stops startup and names the setting. `database.type: SQLITE` stores a
 file under `database.path` and uses one connection. `commands.scope: GUILD` with
 `commands.guildId: 0` registers no commands until you set a server id.
-`hibernate.schema: VALIDATE` runs the SQL files and then checks the tables.
-`UPDATE` skips the SQL files.
+`hibernate.schema` stays `UPDATE` unless you want the SQL files under
+`db/migration` to own the tables.
 
 To add a setting:
 
@@ -101,8 +98,7 @@ A class in another jar that cannot edit `ConfigFile` loads its own file with
 ### Your code
 
 `TemplateBindings` is the list of what this bot runs. `PingCommand` is the
-example. The steps for a command, a listener, a service and a table are in
-[`docs/bot.md`](docs/bot.md). Add a line next to `PingCommand`:
+example. Add a line next to it:
 
 | You are adding | Line |
 | --- | --- |
@@ -113,26 +109,26 @@ example. The steps for a command, a listener, a service and a table are in
 | Service, started before Discord connects | `service(MyService.class)` |
 | Service, started when the bot is ready | `ready(MyService.class)` |
 | Hibernate class | `entity(MyEntity.class)` |
-| SQL file | `migration("sqlite", 2, "/db/migration/sqlite/V2__notes.sql")` |
 
 A command class implements `BaseSlashCommand`, `BaseMessageContextCommand` or
-`BaseUserContextCommand`. `PingCommand` is a slash command. `CommandListener`
-acknowledges the interaction, runs the handler off the gateway thread, and sends
-one ephemeral reply when the handler fails.
+`BaseUserContextCommand`. Copy `PingCommand`. The handler runs after the bot has
+acknowledged the interaction, so the reply goes through `event.getHook()`.
 
 A service implements `IService`: `init`, `shutdown`, and `dependsOn`.
-`service(...)` runs before the bot connects, so it cannot call Discord yet.
-`ready(...)` runs after Discord sends ready. `dependsOn()` names services that
-must already be started. `TaskManager`, `DatabaseManager` and `MenuService` are
-registered this way in `TemplateBindings`.
+`service(...)` runs before the bot connects. `ready(...)` runs after Discord
+sends ready. `dependsOn()` names services that must already be started.
+`TaskManager`, `DatabaseManager` and `MenuService` are registered this way.
+Mark a service `@Singleton`.
 
-`TaskManager` and `MenuService` are `@Singleton`. `ServiceManager` asks Guice for
-the class and calls `init` on whatever it gets back. A second `TaskManager` would
-have pools that were never started.
+A table is an `@Entity` class that extends `BaseDomain`, registered with
+`entity(...)`. On startup Hibernate creates it. You do not add a SQL file for
+that. Discord ids are `long` columns. The row id is an integer on `BaseDomain`.
 
-An SQL migration is one file per database you use (`sqlite`, `h2`, `mariadb`).
-Version 1 is the template's file. Use 2 or higher. The same version twice for the
-same database stops startup.
+Set `hibernate.schema` to `VALIDATE` when you want SQL to own the tables. The
+files live in `db/migration/sqlite`, `h2` and `mariadb`, and each filename is
+listed in the `manifest.txt` next to it. A jar that cannot edit the manifest
+calls `migration(...)` instead. The same version number twice for one database
+stops startup.
 
 A class in another jar extends `BotFeature`, calls the same methods, and is
 listed in `META-INF/services/es.redactado.feature.BotFeature`.
@@ -180,7 +176,9 @@ the manager: an accessor has no future to fail, so it fails at the call.
 ### The database layer
 
 `DatabaseManager` opens Hibernate from the `database` section of `config.yml`.
-How to add a table, write the SQL, and run a query is in [`docs/bot.md`](docs/bot.md).
+Inject it and call `read` or `inTransaction`. From a command or a listener, call
+`readAsync` or `inTransactionAsync` so the query runs on the I/O pool. A read
+and a write that must commit together go in one `inTransaction` call.
 
 A use case calls `DatabaseManager.inTransaction` or `inTransactionAsync`. The async
 form runs on `TaskManager`'s I/O executor, which keeps JDBC off a JDA thread. The

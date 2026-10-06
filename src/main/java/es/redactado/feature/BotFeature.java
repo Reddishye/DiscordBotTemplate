@@ -92,10 +92,11 @@ public abstract class BotFeature extends AbstractModule {
     }
 
     /**
-     * SQL file for one database kind: {@code sqlite}, {@code h2} or {@code mariadb}.
+     * SQL file used when {@code hibernate.schema} is {@code VALIDATE}. {@code UPDATE} ignores it
+     * and builds the table from the entity.
      *
-     * <p>{@code version} is the number in the file name ({@code V2__notes.sql} is version 2). Each
-     * number is used once per database kind. The template's scripts are version 1.
+     * <p>{@code version} is the number in the file name. Each number is used once per database
+     * kind ({@code sqlite}, {@code h2}, {@code mariadb}).
      *
      * @param resource classpath path, for example {@code /db/migration/sqlite/V2__notes.sql}
      */

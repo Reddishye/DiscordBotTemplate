@@ -18,12 +18,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Runs the SQL files for the configured database before Hibernate checks the tables.
+ * Runs the SQL files when {@code hibernate.schema} is {@code VALIDATE}.
  *
- * <p>Files are listed in {@code db/migration/<dialect>/manifest.txt}. A {@link MigrationScript}
- * is added to that list. Each version runs once and is stored in {@code schema_migration}. The
- * same version twice, for the same dialect, stops startup. {@code hibernate.schema: UPDATE}
- * skips this and lets Hibernate change the database.
+ * <p>{@code UPDATE}, the default, does not call this. Hibernate creates the tables from the
+ * entity classes. Files are listed in {@code db/migration/<dialect>/manifest.txt}, and a {@link
+ * MigrationScript} is added to that list. Each version runs once. The same version twice for one
+ * dialect stops startup.
  */
 public final class Migrations {
 
@@ -33,9 +33,6 @@ public final class Migrations {
 
     public static void migrate(BotConfig config, java.util.Collection<MigrationScript> extra) {
         if (config.hibernate().schema() != BotConfig.SchemaMode.VALIDATE) {
-            LOG.warn(
-                    "hibernate.schema is UPDATE, so migrations are skipped and Hibernate may alter"
-                            + " the database");
             return;
         }
         String dialect =

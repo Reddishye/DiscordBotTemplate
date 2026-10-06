@@ -56,8 +56,8 @@ hibernate:
   highlightSql: false
   # Rows per JDBC batch. Environment: BOT_HIBERNATE_BATCH_SIZE.
   batchSize: 50
-  # VALIDATE runs the SQL files, then checks the tables. UPDATE skips the SQL files and lets Hibernate change the database. Environment: BOT_HIBERNATE_SCHEMA.
-  schema: VALIDATE
+  # UPDATE creates and updates tables from entity classes. VALIDATE runs the SQL files, then checks and does not change tables. Environment: BOT_HIBERNATE_SCHEMA.
+  schema: UPDATE
 
 menu:
   # Folder of JSON preset files. Environment: BOT_MENU_PRESETS_DIRECTORY.

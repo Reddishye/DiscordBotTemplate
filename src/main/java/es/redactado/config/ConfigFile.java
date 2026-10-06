@@ -113,13 +113,13 @@ public record ConfigFile(
                     boolean highlightSql,
             @Comment("Rows per JDBC batch. Environment: BOT_HIBERNATE_BATCH_SIZE.") int batchSize,
             @Comment(
-                            "VALIDATE runs the SQL files, then checks the tables. UPDATE skips the"
-                                    + " SQL files and lets Hibernate change the database."
+                            "UPDATE creates and updates tables from entity classes. VALIDATE runs"
+                                    + " the SQL files, then checks and does not change tables."
                                     + " Environment: BOT_HIBERNATE_SCHEMA.")
                     String schema) {
 
         public HibernateFile() {
-            this(false, false, false, 50, "VALIDATE");
+            this(false, false, false, 50, "UPDATE");
         }
     }
 

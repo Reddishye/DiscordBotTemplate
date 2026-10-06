@@ -1,8 +1,7 @@
 # NOTES
 
 What is still open, what is deliberately not built, and the baseline that was verified.
-Commands, services and the database are in `docs/bot.md`. The menu API is in
-`docs/menus-inventory.md`.
+The menu API is in `docs/menus-inventory.md`.
 
 ## Open questions
 
