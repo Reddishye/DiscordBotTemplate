@@ -3,6 +3,8 @@
 A Discord bot built on JDA 6 with Guice for dependency injection, a Hibernate
 database layer, and a menu framework for everything a user interacts with.
 
+Commands, services, tables and settings are in [`docs/bot.md`](docs/bot.md).
+
 ## Table of contents
 
 1. [Overview](#overview)
@@ -62,7 +64,8 @@ src/main/resources/
 src/test/java/es/redactado/
   menu/                     the menu tests, including the scan tests
 docs/
-  menus-inventory.md        the API and the architecture, in full
+  bot.md                    commands, services, the database, settings
+  menus-inventory.md        the menu API and the architecture, in full
   manual-test.md            what to check by hand, with a real bot
 ```
 
@@ -98,7 +101,8 @@ A class in another jar that cannot edit `ConfigFile` loads its own file with
 ### Your code
 
 `TemplateBindings` is the list of what this bot runs. `PingCommand` is the
-example. Add a line next to it:
+example. The steps for a command, a listener, a service and a table are in
+[`docs/bot.md`](docs/bot.md). Add a line next to `PingCommand`:
 
 | You are adding | Line |
 | --- | --- |
@@ -176,8 +180,7 @@ the manager: an accessor has no future to fail, so it fails at the call.
 ### The database layer
 
 `DatabaseManager` opens Hibernate from the `database` section of `config.yml`.
-`entity(...)` in `TemplateBindings` adds a class to that session factory. SQL
-files live under `db/migration` and are registered with `migration(...)`.
+How to add a table, write the SQL, and run a query is in [`docs/bot.md`](docs/bot.md).
 
 A use case calls `DatabaseManager.inTransaction` or `inTransactionAsync`. The async
 form runs on `TaskManager`'s I/O executor, which keeps JDBC off a JDA thread. The

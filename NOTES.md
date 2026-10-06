@@ -1,7 +1,8 @@
 # NOTES
 
 What is still open, what is deliberately not built, and the baseline that was verified.
-The API and the architecture are in `docs/menus-inventory.md`.
+Commands, services and the database are in `docs/bot.md`. The menu API is in
+`docs/menus-inventory.md`.
 
 ## Open questions
 

@@ -60,7 +60,11 @@ public abstract class BotFeature extends AbstractModule {
                 .toInstance(new ManagedEntity(type));
     }
 
-    /** Gateway listener. {@code Main} registers it on the shard manager. */
+    /**
+     * Gateway listener. {@code Main} registers it on the shard manager. A slash command that
+     * implements {@link es.redactado.command.handler.Autocomplete} does not use this.
+     * {@code CommandListener} calls {@code complete} itself.
+     */
     protected final void listener(Class<? extends ListenerAdapter> type) {
         Multibinder.newSetBinder(binder(), ListenerBinding.class)
                 .addBinding()
