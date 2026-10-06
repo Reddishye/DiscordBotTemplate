@@ -1,11 +1,6 @@
-# Menu System Inventory
+# Menu inventory
 
-Reference document for the menu framework. Sections 1 and 2 describe what the
-template provides and what JDA actually does; section 3 records what was ported
-from the source menu tree and what was deliberately not; section 3.6 is the
-declarative DSL. Every JDA statement was verified against the sources jar of the
-exact JDA version this template depends on, and every framework claim against the
-code as it stands. What is still open is in `NOTES.md`.
+API reference for `es.redactado.menu`. Open items are in `NOTES.md`.
 
 ## 1. Target template
 
@@ -26,13 +21,9 @@ The menu framework therefore lives under `es.redactado.menu`.
 | Item | Value |
 | --- | --- |
 | Build tool | Gradle 9.8.0 (Kotlin DSL, `build.gradle.kts`) |
-| Java version | **27**, pinned by `java { toolchain { languageVersion = JavaLanguageVersion.of(27) } }`. Nothing in the menu package uses a feature newer than 21; the baseline moved because the project needs 27 |
+| Java version | 27 (`JavaLanguageVersion.of(27)`) |
 | Formatter | Spotless 8.9.0, google-java-format 1.26.0, AOSP style, `reflowLongStrings`, `skipJavadocFormatting`, `formatAnnotations`, `removeUnusedImports` |
 | Packaging | Shadow 9.6.1 (`shadowJar`), Sentry Gradle plugin 6.18.0, `application` plugin with main class `es.redactado.Main` |
-
-A formatter is already configured, so Spotless stays as-is. Java 27 is the
-baseline; the features the menu package actually uses, records, sealed
-hierarchies, pattern-matching `switch` and virtual threads, all arrived by 21.
 
 ### 1.3 Dependencies
 
@@ -49,21 +40,9 @@ Present in `build.gradle.kts`:
 - jackson-databind `2.19.1`
 
 Test-only: JUnit Jupiter `5.11.4`, Mockito `5.14.2`, AssertJ `3.26.3`,
-`junit-platform-launcher`, and `net.bytebuddy:byte-buddy-agent:1.17.6` in a
-dedicated `mockitoAgent` configuration used as a `-javaagent`.
+`junit-platform-launcher`, and `net.bytebuddy:byte-buddy-agent:1.17.6` (`mockitoAgent`, `-javaagent`).
 
-Findings that affect the port:
-
-- **Caffeine is a direct dependency.** The session store, cooldown cache and
-  Hibernate second-level cache use it. Section 2.3 describes the session store.
-- **Test infrastructure was added.** There was no `src/test` tree, no test
-  dependency, and no `useJUnitPlatform()`. See section 1.8.
-- **Serialization.** Jackson Databind `2.19.1` is resolved in `runtimeClasspath`
-  through JDA's own dependency, but it is *not* on `compileClasspath`, so menu
-  code cannot compile against it without a declaration. It is declared explicitly
-  at the already-resolved version rather than introducing a new library. Preset
-  files are JSON. Bot settings are YAML through ConfigLib, which the menu
-  package does not import.
+Caffeine is used by the session store, command cooldowns, and the Hibernate second-level cache. Preset files are JSON. `config.yml` is ConfigLib YAML. The `menu` package does not import ConfigLib.
 
 ### 1.4 Dependency injection
 
@@ -555,18 +534,7 @@ would have used a deprecated method even on that version.
 `DiscordLocale#getLanguageTag()` and `getLocale()` are available, so locale
 selection can follow interaction locale, then guild locale, then English.
 
-## 3. Source menu tree
-
-Root: `/home/redactado/Workspace/scpsl-helperbot/src/main/java/es/redactado/menu`
-(29 files, 1737 lines of Java, including `ProfileMenu`).
-
-The source project uses JDA 6.4.2, which the target has now moved past, so
-every Components V2 pattern the source relies on ports over unchanged. The only
-API edits the port needs are the ones made for the menu framework's own rules,
-not for version compatibility.
-
-`repomix-output.xml` in the source menu directory is a generated dump, not code,
-and is not ported.
+## 3. Class map
 
 ### 3.1 Classes ported
 
@@ -912,4 +880,4 @@ literal text where the framework is not.
 
 ## 4. Open questions
 
-Recorded in `NOTES.md` rather than resolved unilaterally.
+See `NOTES.md`.

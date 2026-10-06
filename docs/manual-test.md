@@ -1,21 +1,10 @@
-# Manual test checklist
+# Manual test
 
-How to check the menu system by hand, once a test bot runs the showcase menu.
+Requires a running bot and `ShowcaseMenu` opened by a command. `ShowcaseMenu` and the simple-menu examples are not registered by default. Registration is in [Opening the showcase](#opening-the-showcase).
 
-The showcase (`es.redactado.menu.examples.ShowcaseMenu`) is compiled and tested but
-**never registered by default**. Neither are the three simple-menu examples, listed in
-the last section. The framework now ships wired: `MenuService` starts
-with the bot and `MenuListener` routes interactions to it. What it does **not** ship
-is a way to open a menu, because that is the developer's decision. The section
-"Opening the showcase" at the end gives you a throwaway command; until you add it,
-there is nothing to open and therefore nothing to test.
+Owner: the account that opened the menu. Stranger: a second account (item 6).
 
-Run through the numbered items in order. Each one says what to press and what you
-should see. Anything that does not match is a defect worth reporting with the
-message id and the log line that went with it.
-
-Throughout, the person who pressed the button is the **owner**. A second account
-is the **stranger**, used in item 6.
+Record the message id and the log line when a step does not match.
 
 ---
 
@@ -192,12 +181,7 @@ failure does not print twice for one click.
 
 ## Opening the showcase
 
-The framework **ships no commands**. Opening a menu is the developer's decision: a slash
-command, another system's button, a modal. What ships is the primitive,
-`MenuService.open`, and the router that `MenuListener` already feeds.
-
-Nothing below is shipped code. It is a throwaway command of your own, written to the
-template's real command conventions so it compiles as-is.
+`MenuService` and `MenuListener` start with the bot. No command opens a menu until one is registered.
 
 ### 1. A command class
 
@@ -244,21 +228,14 @@ public class ShowcaseCommand implements BaseSlashCommand {
 
 ### 2. What this does, and what it does not
 
-- **Registration happens on the first click.** `register` is idempotent per id but throws
-  on a duplicate, so guard it if you expect repeated use; the snippet above is fine for a
-  test bot and wrong for a busy one.
-- **The second argument is ephemeral.** `true` means only the person who ran the command
-  sees the menu. Pass `false` for a shared board.
-- **The showcase reads `menuService.presets()`** so the preset picker lists your custom
-  presets as well as the five built-in ones.
-- **Remove the line and the copied class when you are done.** The showcase is an example.
+- `register` with the same id is a no-op. A different class with that id throws.
+- `open(event, id, true)` is visible only to the invoking user. `false` is a shared message.
+- `menuService.presets()` includes custom preset files and the five built-in presets.
+- Remove `slashCommand(ShowcaseCommand.class)` and the copied class after the test.
 
 ### 3. The simple-menu examples
 
-The three examples in `es.redactado.menu.examples` are **not registered either**. To
-walk them by hand, register whichever you want in the same command and open it by
-id. Each is built by a static method, so this is a one-line change to the command
-above:
+`HelpMenu`, `CounterMenu`, and `ServerInfoMenu` are not registered. Register and open them from the same command:
 
 ```java
 import es.redactado.menu.examples.CounterMenu;
@@ -282,33 +259,16 @@ The `FakeService` delay is deliberate: it proves the load runs off the JDA event
 thread. Lower it to `0` if you want the menu to feel instant, and delete the three
 examples when you are done, like the showcase.
 
-### 4. Which manual-test steps this makes possible
-
-**Steps 1 to 11 above**, all of them. Before this snippet nothing in the checklist was
-reachable, because there was no way to open a menu; with it, the only thing standing
-between you and a test run is a restart. Section 3 adds the three simple-menu examples
-to the same run.
+Items 1–11 use the showcase command. The three examples above cover the same run for `help`, `counter`, and `server_info`.
 
 ---
 
-## Not testable with mocks
+## Requires a client
 
-Everything above needs a real bot, because each item is about something a stub
-cannot tell you. A mocked interaction has no client, so there is no layout to
-look at; no rendering, so there is nothing to compare against a screenshot; no
-network, so no rate limit, no latency and no three-second acknowledgement budget;
-no filesystem, so no preset watcher; no restart, so no expiry; and no second
-account, so no ownership check by anyone else's hand.
+Items 3, 5, and 10 are not covered by unit tests:
 
-Three items in particular are worth doing by hand even if everything else is
-automated later:
-
-- **Item 3, the rapid double click.** The guard is unit tested with two mock
-  events, which proves one handler ran. Only a real client shows whether the
-  button *looks* like it did nothing.
-- **Item 5, the modal's own validation.** Discord rejects a too-long or empty
-  required field before the bot ever sees it. No mock can reproduce a rejection
-  the bot did not send.
-- **Item 10, hot reload.** The watcher needs a real `WatchService`, real file
-  writes and real time. Its automated test is tagged `filesystem` for that reason
-  and is skipped with `./gradlew test -PexcludeTags=filesystem`.
+| Item | Gap |
+| --- | --- |
+| 3 | Unit test checks that one handler runs. It does not check the button appearance |
+| 5 | Discord rejects an empty or over-long required modal field before the bot receives it |
+| 10 | Preset reload uses `WatchService`. The automated test is tagged `filesystem` and is skipped with `./gradlew test -PexcludeTags=filesystem` |

@@ -1,40 +1,42 @@
 # Configuration
 
-The first start writes `config.yml` from the defaults in `config.example.yml`.
-Edit `config.yml`. The comment on each value names the environment variable that
-overrides it, such as `BOT_TOKEN` and `BOT_DATABASE_HOST`. A blank variable
-leaves the file value. The file is not rewritten.
+First start writes `config.yml` from `config.example.yml`. Each comment in that file is the environment variable for that field.
 
-`CONFIG_FILE` is the path when the file is not called `config.yml`.
+A blank environment variable does not replace the file value. The file is not written back after the overlay.
 
-A bad value stops startup and names the setting.
+`CONFIG_FILE` sets the path. Default: `config.yml`.
 
-| Value | Effect |
+Invalid values abort startup. The error names the field.
+
+| Setting | Result |
 | --- | --- |
-| `database.type: SQLITE` | A file under `database.path`, one connection |
-| `database.type: MARIADB` | `host`, `port`, `name`, `user`, `password` |
-| `commands.scope: GUILD` and `commands.guildId: 0` | No commands are registered until you set a server id |
-| `commands.scope: GLOBAL` | Commands are registered once, from shard 0 |
-| `hibernate.schema: UPDATE` | Hibernate creates and updates tables from entity classes. This is the default |
-| `hibernate.schema: VALIDATE` | The SQL files under `db/migration` own the tables. See `docs/database.md` |
+| `database.type: SQLITE` | File under `database.path`. Pool size 1. `host`, `port`, `user`, and `password` are unused |
+| `database.type: H2` | File under `database.path` |
+| `database.type: MARIADB` | Uses `host`, `port`, `name`, `user`, `password` |
+| `commands.scope: GUILD` | Registers commands on `commands.guildId`. `0` registers nothing |
+| `commands.scope: GLOBAL` | Registers commands once, from shard 0 |
+| `hibernate.schema: UPDATE` | Default. Hibernate creates and updates tables from entity classes |
+| `hibernate.schema: VALIDATE` | Runs `db/migration` SQL, then checks tables and does not alter them. See `docs/database.md` |
 
-## Add a setting
+## New field
 
-1. Add the field to the record in `ConfigFile`, and a default in that record's
-   no-arg constructor. Name the environment variable in the `@Comment`.
-2. Add the same field to `BotConfig` and set it in `BotConfig.from`. The bot
-   reads `BotConfig`.
+1. Add the field to the record in `ConfigFile`, with a default in the no-arg constructor and the environment name in `@Comment`.
+2. Add the field to `BotConfig` and assign it in `BotConfig.from`.
 
-The environment name is the YAML path. `database.host` is `BOT_DATABASE_HOST`.
-`bot.token` is `BOT_TOKEN`, because that path already starts with `bot`.
+Environment names are the YAML path in capitals, with `.` replaced by `_`, prefixed with `BOT_`.
 
-A class in another jar that cannot edit `ConfigFile` loads its own file from
-the same directory:
+| YAML | Variable |
+| --- | --- |
+| `database.host` | `BOT_DATABASE_HOST` |
+| `bot.token` | `BOT_TOKEN` |
+| `menu.sessionIdleTtl` | `BOT_MENU_SESSION_IDLE_TTL` |
+
+## Separate file
+
+A class outside this repository loads another YAML file from the same directory as `config.yml`:
 
 ```java
 WelcomeSettings settings = files.load("welcome.yml", WelcomeSettings.class);
 ```
 
-`files` is an injected `ConfigFiles`. `WelcomeSettings` is a ConfigLib record
-with a no-arg constructor, the same shape as the records in `ConfigFile`. That
-file does not get the `BOT_` overlay.
+`files` is `ConfigFiles`. `WelcomeSettings` is a ConfigLib record with a no-arg constructor. This file has no `BOT_` overlay.

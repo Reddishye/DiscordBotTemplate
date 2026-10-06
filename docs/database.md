@@ -1,68 +1,82 @@
 # Database
 
-A table is an `@Entity` class that extends `BaseDomain`. Register it with
-`entity(...)` in `TemplateBindings`. With `hibernate.schema: UPDATE`, which is
-the default, Hibernate creates the table on startup. You do not write SQL for
-a table you are not changing later.
+## Entity
 
-Discord ids are `long` columns. The row id on `BaseDomain` is an integer.
-`version` increments on each update, and a write that still has the old number
-fails. The entity needs a protected no-arg constructor. `PresetPreference` is
-the class to copy.
+Subclass `BaseDomain`. Annotate `@Entity`. Add a protected no-arg constructor. Register with `entity(MyEntity.class)` in `TemplateBindings`.
 
-`database.type` is `SQLITE`, `H2`, or `MARIADB`. SQLite and H2 store a file
-under `database.path`. SQLite uses one connection. MariaDB uses `host`, `port`,
-`name`, `user`, and `password`.
+`BaseDomain` columns: `id` (integer), `created_at`, `updated_at`, `version`. `version` increments on update. An update with a stale `version` fails.
+
+Discord snowflakes are `long` columns, not `id`. Reference entity: `PresetPreference`.
+
+## Connection
+
+| `database.type` | Storage |
+| --- | --- |
+| `SQLITE` | File in `database.path`. Pool size 1 |
+| `H2` | File in `database.path` |
+| `MARIADB` | `host`, `port`, `name`, `user`, `password` |
+
+## Schema
+
+| `hibernate.schema` | Behavior |
+| --- | --- |
+| `UPDATE` | Default. Hibernate creates missing tables and columns from entities. SQL files are not applied |
+| `VALIDATE` | Applies SQL files, then checks that entities match. Does not alter tables |
 
 ## Queries
 
-Inject `DatabaseManager`. One call is one transaction.
+Inject `DatabaseManager`. Each call is one transaction. Calls before `init` throw `IllegalStateException`.
 
-| Call | Use |
+| Method | Transaction | Thread |
+| --- | --- | --- |
+| `read` | Read-only | Caller |
+| `inTransaction` | Read-write | Caller |
+| `readAsync` | Read-only | I/O pool |
+| `inTransactionAsync` | Read-write | I/O pool |
+
+Use the async methods from command handlers and listeners. A read and a write that must commit together belong in one `inTransaction` or `inTransactionAsync` call.
+
+Reference: `StoredPresetPreferences`.
+
+`AbstractRepository` provides `save`, `findById`, `findRange`, `delete`, and `deleteById`. Pass `DatabaseManager` to the constructor. `findRange(offset, limit)` requires `offset >= 0` and `limit` from 1 to 200. Each method opens its own transaction.
+
+## Existing tables
+
+`preset_preference`: one preset name per guild or user.
+
+| Column | Values |
 | --- | --- |
-| `read` | A query. The session is read-only |
-| `inTransaction` | A write, or a read and a write that commit together |
-| `readAsync` | The same query, on the I/O pool. Use this from a command or a listener |
-| `inTransactionAsync` | The same write, on the I/O pool |
+| `scope` | `GUILD` or `USER` |
+| `subject_id` | Guild id or user id |
+| `preset_name` | Preset id, for example `default` |
 
-`StoredPresetPreferences` looks up a row with `readAsync` and saves it with
-`inTransactionAsync`.
+`channel_panel`: one Discord message per guild, channel, and menu.
 
-`AbstractRepository` supplies `save`, `findById`, `findRange`, `delete`, and
-`deleteById`. Subclass it and pass `DatabaseManager` to the constructor.
-`findRange` takes an offset and a limit from 1 to 200. Each method is its own
-transaction. Calling any of these before `DatabaseManager` has started throws.
+| Column | Values |
+| --- | --- |
+| `guild_id`, `channel_id`, `menu_id` | Lookup key |
+| `message_id` | Message edited by the next publish |
 
-## Tables the template already has
+## SQL (`VALIDATE` only)
 
-`preset_preference` stores the preset last chosen for a guild or a user.
-`scope` is `GUILD` or `USER`. `subject_id` is that guild id or user id.
-`preset_name` is the preset id, such as `default`.
+Directories:
 
-`channel_panel` stores the Discord message currently showing one menu in a
-channel. One row per guild, channel, and menu. `message_id` is the message the
-next publish edits.
+- `src/main/resources/db/migration/sqlite/`
+- `src/main/resources/db/migration/h2/`
+- `src/main/resources/db/migration/mariadb/`
 
-## SQL files
+File name: `V<version>__<name>.sql`. Add the file name to `manifest.txt` in the same directory.
 
-Leave `hibernate.schema` at `UPDATE` until you want to review every change.
-`VALIDATE` runs the files in `db/migration/sqlite`, `h2`, and `mariadb`, then
-checks the tables and does not change them. Each filename is a line in the
-`manifest.txt` beside it. The name looks like `V2__notes.sql`. The number is
-the version. The same number twice for one database stops startup. A number
-can be reused across sqlite, h2, and mariadb.
+The version number is unique per database type. The same number may be used in more than one directory.
 
-The id column is not the same in each file:
+`id` column:
 
-| Database | `id` |
+| Database | DDL |
 | --- | --- |
 | sqlite | `integer primary key autoincrement` |
 | h2 | `integer generated by default as identity primary key` |
 | mariadb | `integer not null auto_increment primary key` |
 
-A Discord id column is `bigint not null` in all three. Copy `created_at`,
-`updated_at`, and `version` from `V1__preset_and_panel.sql`.
+Discord id columns: `bigint not null`. Copy `created_at`, `updated_at`, and `version` from `V1__preset_and_panel.sql`.
 
-A jar that cannot edit `manifest.txt` calls `migration("sqlite", 2, "/db/migration/sqlite/V2__notes.sql")`
-instead, and the same for `h2` and `mariadb`. Use the manifest or
-`migration(...)`, not both. `UPDATE` ignores these files.
+A jar that does not contain those manifests calls `migration(dialect, version, resource)` instead of editing `manifest.txt`. Do not register the same version in both places. `dialect` is `sqlite`, `h2`, or `mariadb`. `resource` is a classpath path starting with `/`.

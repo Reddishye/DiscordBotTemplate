@@ -1,75 +1,72 @@
 # Features
 
-`TemplateBindings` is the list of what this bot runs. `PingCommand` is already
-on it. Add a line in `contribute()` next to that one.
+Register types in `TemplateBindings.contribute()`. `PingCommand` is already registered.
 
-| You are adding | Line |
+| Type | Call |
 | --- | --- |
 | Slash command | `slashCommand(MyCommand.class)` |
 | Message command | `messageCommand(MyCommand.class)` |
 | User command | `userCommand(MyCommand.class)` |
-| Gateway listener | `listener(MyListener.class)` |
-| Service, started before the bot connects | `service(MyService.class)` |
-| Service, started when Discord sends ready | `ready(MyService.class)` |
+| Listener | `listener(MyListener.class)` |
+| Service, before connect | `service(MyService.class)` |
+| Service, after ready | `ready(MyService.class)` |
 | Entity | `entity(MyEntity.class)` |
 
-Guice constructs these classes. An `@Inject` constructor can take
-`DatabaseManager`, `MenuService`, `BotConfig`, or another service.
+Guice constructs the class. `@Inject` can request `DatabaseManager`, `MenuService`, `BotConfig`, or another `@Singleton` service.
 
-A class in another jar extends `BotFeature`, calls the same methods, and is
-named on its own line in
-`META-INF/services/es.redactado.feature.BotFeature` inside that jar. Do not put
-`TemplateBindings` in that file.
+Another jar: subclass `BotFeature`, use the same calls, and add the class name to `META-INF/services/es.redactado.feature.BotFeature` in that jar. Do not list `TemplateBindings` there.
 
-## Commands
+## Slash commands
 
-A slash command implements `BaseSlashCommand`. Copy `PingCommand`.
+Implement `BaseSlashCommand`. Reference: `PingCommand`.
 
-`getCommandData()` is the name Discord shows. Two commands with the same name
-stop startup. `handle` runs after the interaction is already acknowledged, so
-the reply goes through `event.getHook()`.
+| Method | Behavior |
+| --- | --- |
+| `getCommandData()` | Name and description sent to Discord. Duplicate names abort startup |
+| `handle` | Runs after acknowledgement. Reply with `event.getHook()` |
+| `cooldown()` | `null` uses `commands.defaultCooldown`. `Duration.ZERO` disables it. `0s` in config disables the default |
+| `ephemeral()` | `false`: public reply. `true`: only the invoking user |
+| `permissions()` | Empty: no check. Otherwise the member must have the set. Failure is one ephemeral reply and `handle` is not called |
 
-| Method | Default | Override |
+`CommandFailure` sends its message to the user. Any other exception sends "Something went wrong while running that command." and logs the stack trace.
+
+Autocomplete: implement `Autocomplete` on the same class. `CommandListener` calls `complete`.
+
+## Message and user commands
+
+| Kind | Interface | Data |
 | --- | --- | --- |
-| `cooldown()` | `commands.defaultCooldown` from `config.yml`. `0s` means none | A `Duration` for this command. `Duration.ZERO` turns it off |
-| `ephemeral()` | The reply is public | `true` shows it only to the person who ran the command |
-| `permissions()` | Anyone can run it | The member needs these Discord permissions, or they get one refusal and the handler does not run |
+| Message | `BaseMessageContextCommand` | `Commands.message(...)` |
+| User | `BaseUserContextCommand` | `Commands.user(...)` |
 
-Throw `CommandFailure` with the sentence the user should read. Any other
-exception becomes "Something went wrong while running that command." and the
-stack trace goes to the log.
+Replies are ephemeral and use the hook. No cooldown. No permission set.
 
-Autocomplete is the `Autocomplete` interface on the same class. `CommandListener`
-calls `complete`. No extra registration line.
+## Command registration scope
 
-A message command implements `BaseMessageContextCommand` and uses
-`Commands.message(...)`. A user command implements `BaseUserContextCommand` and
-uses `Commands.user(...)`. Both replies are ephemeral and go through the hook.
-They do not take a cooldown or a permission set.
-
-Where the command is registered depends on `commands.scope`. `GUILD` uses
-`commands.guildId`. `0` registers nothing. `GLOBAL` registers once from shard 0.
+| `commands.scope` | Target |
+| --- | --- |
+| `GUILD` | `commands.guildId`. `0` skips registration |
+| `GLOBAL` | Shard 0, all guilds |
 
 ## Listeners
 
-A `ListenerAdapter` that is not a command is registered with `listener(...)`.
-`Main` adds it to the shard manager. Commands do not use this. `CommandListener`
-already receives slash, message, user, and autocomplete events.
+`listener(MyListener.class)` registers a `ListenerAdapter` on the shard manager. Slash, message, user, and autocomplete events are already handled by `CommandListener`.
 
 ## Services
 
-A service implements `IService` and is `@Singleton`.
+Implement `IService`. Annotate `@Singleton`.
 
-| Method | Role |
+| Method | When |
 | --- | --- |
-| `init` | Open clients, build caches, schedule work |
-| `shutdown` | Close what `init` opened |
-| `dependsOn` | Services that must already have finished `init`. The default is none |
+| `init` | Startup |
+| `shutdown` | Process shutdown, reverse of start order |
+| `dependsOn` | Classes whose `init` must finish first. Default: none |
 
-`service(...)` runs before the bot connects. `ready(...)` runs after Discord
-sends ready. `TaskManager`, `DatabaseManager`, and `MenuService` are
-`service(...)` entries. `MenuService` depends on the other two, so they start
-first.
+| Call | `init` runs |
+| --- | --- |
+| `service(...)` | Before the gateway connects |
+| `ready(...)` | After the ready event |
 
-`TaskManager.ioExecutor()` is for database and HTTP. `cpuExecutor()` is for CPU
-work. Both throw if called before `init`.
+`TaskManager`, `DatabaseManager`, and `MenuService` use `service(...)`. `MenuService.dependsOn` is `TaskManager` and `DatabaseManager`.
+
+`TaskManager.ioExecutor()` is for database and HTTP. `cpuExecutor()` is for CPU work. Both throw `IllegalStateException` before `init()`.
