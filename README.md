@@ -6,8 +6,6 @@ database layer, and a menu framework for everything a user interacts with.
 ## Table of contents
 
 1. [Overview](#overview)
-   - [Configuration](#configuration)
-   - [Your code](#your-code)
 2. [Architecture of the template](#architecture-of-the-template)
 3. [Menus: how an interaction flows](#menus-how-an-interaction-flows)
 4. [Building menus](#building-menus)
@@ -62,76 +60,16 @@ src/main/resources/
 src/test/java/es/redactado/
   menu/                     the menu tests, including the scan tests
 docs/
+  configuration.md          config.yml and environment variables
+  features.md               commands, listeners, services, entities
+  database.md               tables and queries
   menus-inventory.md        the menu API and the architecture, in full
   manual-test.md            what to check by hand, with a real bot
 ```
 
-### Configuration
-
-The first start writes `config.yml`. `config.example.yml` is that file with a
-comment on every value. Edit `config.yml`. Each comment names the environment
-variable that overrides that one value, for example `BOT_TOKEN` and
-`BOT_DATABASE_HOST`. A blank variable leaves the file value. The file is not
-rewritten.
-
-`CONFIG_FILE` is the path when the file is not named `config.yml`.
-
-A bad value stops startup and names the setting. `database.type: SQLITE` stores a
-file under `database.path` and uses one connection. `commands.scope: GUILD` with
-`commands.guildId: 0` registers no commands until you set a server id.
-`hibernate.schema` stays `UPDATE` unless you want the SQL files under
-`db/migration` to own the tables.
-
-To add a setting:
-
-1. Add the field to the record in `ConfigFile`, and a default in that record's
-   no-arg constructor. Name the environment variable in the `@Comment`.
-2. Add the same field to `BotConfig` and set it in `BotConfig.from`. The rest
-   of the bot reads `BotConfig`, not the YAML record.
-
-The environment name is the YAML path: `database.host` is `BOT_DATABASE_HOST`.
-Under `bot`, the path already starts with `bot`, so `bot.token` is `BOT_TOKEN`.
-
-A class in another jar that cannot edit `ConfigFile` loads its own file with
-`ConfigFiles.load("welcome.yml", WelcomeSettings.class)` from the same directory.
-
-### Your code
-
-`TemplateBindings` is the list of what this bot runs. `PingCommand` is the
-example. Add a line next to it:
-
-| You are adding | Line |
-| --- | --- |
-| Slash command | `slashCommand(MyCommand.class)` |
-| Message command | `messageCommand(MyCommand.class)` |
-| User command | `userCommand(MyCommand.class)` |
-| Gateway listener | `listener(MyListener.class)` |
-| Service, started before Discord connects | `service(MyService.class)` |
-| Service, started when the bot is ready | `ready(MyService.class)` |
-| Hibernate class | `entity(MyEntity.class)` |
-
-A command class implements `BaseSlashCommand`, `BaseMessageContextCommand` or
-`BaseUserContextCommand`. Copy `PingCommand`. The handler runs after the bot has
-acknowledged the interaction, so the reply goes through `event.getHook()`.
-
-A service implements `IService`: `init`, `shutdown`, and `dependsOn`.
-`service(...)` runs before the bot connects. `ready(...)` runs after Discord
-sends ready. `dependsOn()` names services that must already be started.
-`TaskManager`, `DatabaseManager` and `MenuService` are registered this way.
-Mark a service `@Singleton`.
-
-A table is an `@Entity` class that extends `BaseDomain`, registered with
-`entity(...)`. On startup Hibernate creates it. You do not add a SQL file for
-that. Discord ids are `long` columns. The row id is an integer on `BaseDomain`.
-
-Set `hibernate.schema` to `VALIDATE` when you want SQL to own the tables. The
-files live in `db/migration/sqlite`, `h2` and `mariadb`, and each filename is
-listed in the `manifest.txt` next to it. A jar that cannot edit the manifest
-calls `migration(...)` instead. The same version number twice for one database
-stops startup.
-
-A class in another jar extends `BotFeature`, calls the same methods, and is
-listed in `META-INF/services/es.redactado.feature.BotFeature`.
+Settings are `config.yml`. What the bot runs is a line in `TemplateBindings`.
+The steps are in `docs/configuration.md`, `docs/features.md`, and
+`docs/database.md`.
 
 ### Running
 
@@ -176,15 +114,7 @@ the manager: an accessor has no future to fail, so it fails at the call.
 ### The database layer
 
 `DatabaseManager` opens Hibernate from the `database` section of `config.yml`.
-Inject it and call `read` or `inTransaction`. From a command or a listener, call
-`readAsync` or `inTransactionAsync` so the query runs on the I/O pool. A read
-and a write that must commit together go in one `inTransaction` call.
-
-A use case calls `DatabaseManager.inTransaction` or `inTransactionAsync`. The async
-form runs on `TaskManager`'s I/O executor, which keeps JDBC off a JDA thread. The
-Hikari pool, not the virtual threads, bounds how many queries run at once. Repository
-methods each open one transaction; a read and a write that belong together share one
-call to `inTransaction` instead.
+Queries and schema are in `docs/database.md`.
 
 ### How DI scopes services
 

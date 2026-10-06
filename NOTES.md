@@ -1,7 +1,9 @@
 # NOTES
 
 What is still open, what is deliberately not built, and the baseline that was verified.
-The menu API is in `docs/menus-inventory.md`.
+Settings, features, and the database are in `docs/configuration.md`,
+`docs/features.md`, and `docs/database.md`. The menu API is in
+`docs/menus-inventory.md`.
 
 ## Open questions
 
