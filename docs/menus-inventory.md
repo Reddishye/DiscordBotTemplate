@@ -5,8 +5,7 @@ template provides and what JDA actually does; section 3 records what was ported
 from the source menu tree and what was deliberately not; section 3.6 is the
 declarative DSL. Every JDA statement was verified against the sources jar of the
 exact JDA version this template depends on, and every framework claim against the
-code as it stands. The reasoning behind the choices is in
-`docs/design-decisions.md`, and what is still open is in `NOTES.md`.
+code as it stands. What is still open is in `NOTES.md`.
 
 ## 1. Target template
 

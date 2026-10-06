@@ -24,9 +24,8 @@ import org.junit.jupiter.api.Test;
  * than it saves. A file that grows past the limit has to be added here with a reason, which
  * is the point: growing quietly is how the limit stops meaning anything.
  *
- * <p>Method length is reported rather than gated. A long method is sometimes the honest shape
- * of a linear check, and a line count cannot tell that from a method that has grown four
- * responsibilities. The report is in {@code docs/design-decisions.md}.
+ * <p>Method length is not gated. A long method is sometimes one linear check, and a line count
+ * cannot tell that from a method that has grown four responsibilities.
  */
 class ClassSizeTest {
 

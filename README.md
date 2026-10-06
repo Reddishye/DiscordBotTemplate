@@ -63,7 +63,6 @@ src/test/java/es/redactado/
   menu/                     the menu tests, including the scan tests
 docs/
   menus-inventory.md        the API and the architecture, in full
-  design-decisions.md       why the code is shaped as it is
   manual-test.md            what to check by hand, with a real bot
 ```
 

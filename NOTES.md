@@ -1,8 +1,7 @@
 # NOTES
 
 What is still open, what is deliberately not built, and the baseline that was verified.
-The decisions behind the code are in `docs/design-decisions.md`; the API and the
-architecture are in `docs/menus-inventory.md`.
+The API and the architecture are in `docs/menus-inventory.md`.
 
 ## Open questions
 

@@ -22,8 +22,7 @@ import org.junit.jupiter.api.Test;
  * one is a test with the file and line in the failure message.
  *
  * <p>What is deliberately not here: whether a comment restates the code, and how long a method
- * is. Both need a judgement a regex cannot make, so they stay reports rather than gates. The
- * method-length report lives in {@code docs/design-decisions.md}.
+ * is. Both need a judgement a regex cannot make.
  */
 class SourceStyleTest {
 
